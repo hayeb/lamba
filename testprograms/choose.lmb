@@ -1,0 +1,6 @@
+choose :: Bool -> String
+choose bool
+| bool = "true"
+| !bool = "false"
+
+Main = choose True

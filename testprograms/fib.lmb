@@ -1,0 +1,6 @@
+fib :: Int -> Int
+fib 0 = 1
+fib 1 = 1
+fib n = fin (n - 1) + fin (n - 2)
+
+Main = fib 15
