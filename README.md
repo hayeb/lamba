@@ -1,46 +1,24 @@
--- First: Only type-checking
--- Functional language
--- Pure language
--- Goal: Easy to work with, good error messages.
--- Standard operators: + - * / % (Int -> Int)
--- Whitespace independent
--- Pattern matching + algebraic datatypes
--- Polymorphism
+# Lamba
 
+A in-development functional programming language.
 
-Booleans: True | False
-Strings: ""
-Characters: 'c'
+This project is mainly my attempt at learning how a functional language works and how to write a compiler for one. It is heavily in development and there are no working programs yet.
 
+### Aims
 
-Hello world:
-	Main = print "Hello, world!"
+* Easy to understand, well-documented compiler
+* Generate LLVM or Java Bytecode
+* Clear error messages
 
-Factorial:
-	fac :: Int -> Int
-	fac 1 = 1
-	fac n = n * fac (n - 1)
+### The Lamba Language
 
-	Main = fac 15
+Lamba is a pure, functional programming language. It is going to (roughly) support the following features:
 
-Fibonacci:
-	fib :: Int -> Int
-	fib 0 = 1
-	fib 1 = 1
-	fib n = fin (n - 1) + fin (n - 2)
+* Type inferencing
+* Defining algebraic (sum) datatypes
+* Pattern matching
+* Decent standard library
+* Laziness
+* Polymorphism
 
-	Main = fib 15
-
-Choices:
-	choose :: Bool -> String
-	choose bool
-	| bool = "true"
-	| !bool = "false"
-
-	Main = choose True
-
-Let:
-	greet :: String -> String
-	greet name
-	# greetString = "Hello, " + name + "!"
-	= greetString
+Example programs can be found in the testprograms folder.
