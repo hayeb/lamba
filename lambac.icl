@@ -76,7 +76,10 @@ where
 		>>= \contents. case tokenize contents of
 			Left e = compileError (toString e)
 			Right tokens = pure tokens
-		>>= \tokens. return ("Tokenizing succeeded")
+		>>= \tokens. case parse tokens of
+			Left e = compileError (toString e)
+			Right ast = pure ast
+		>>= \ast. pure "Parsing succeeded"
 
 
 
