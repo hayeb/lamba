@@ -20,5 +20,6 @@ import Lamba.Language.Token
 
 instance == TokenizerError
 instance toString TokenizerError
+instance toString (TokenizerLocation, Token)
 
 tokenize :: String -> Either TokenizerError [(TokenizerLocation, Token)]

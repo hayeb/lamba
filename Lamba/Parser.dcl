@@ -7,4 +7,6 @@ import Lamba.Language.AST
 
 :: ParseError = ParseError String
 
+instance toString ParseError
+
 parse :: [((Int, Int), Token)] -> Either ParseError AST

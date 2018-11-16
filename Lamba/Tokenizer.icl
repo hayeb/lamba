@@ -1,6 +1,6 @@
 implementation module Lamba.Tokenizer
 
-import Data.Either, Text, StdChar
+import Data.Either, Text, StdChar, Data.Func
 import Lamba.Language.Token
 
 import StdMisc, StdDebug
@@ -26,6 +26,33 @@ where
 	toString (IllegalCharacterIdentifier c) = "Illegal character in identifier: \'" + toString c + "\'"
 	toString (UnknownToken c) = "Unknown token: \'" + toString c + "\'"
 
+instance toString (TokenizerLocation, Token)
+where
+	toString ((line, col), token) = "[" + toString line + ":" + toString col + "] " + toString token
+
+putState :: Int Int ((Int, Int), Token) TokenizerState -> TokenizerState
+putState lineInc colInc token state
+= putStateSep colInc lineInc colInc token state
+
+putStateSep :: Int Int Int ((Int, Int), Token) TokenizerState -> TokenizerState
+putStateSep indexInc lineInc colInc token state=:{index, line,column,tokens}
+| not (trace_tn ("putStateSep " + toString token) ) = undef
+= {state & index = index + indexInc
+  , line = line + lineInc
+  , column = column + colInc
+  , tokens = [token : tokens]}
+
+advState :: Int Int TokenizerState -> TokenizerState
+advState lineInc colInc state
+= advStateSep colInc lineInc colInc state
+
+advStateSep :: Int Int Int TokenizerState -> TokenizerState
+advStateSep indexInc lineInc colInc state=:{index, line, column}
+| not (trace_tn ("advStateSep [" + toString lineInc + "," + toString colInc + "]")) = undef
+= { state & index = index + indexInc
+  , line = line + lineInc
+  , column = column + colInc}
+
 tokenize :: String -> Either TokenizerError [(TokenizerLocation, Token)]
 tokenize s = tokenize` (newState s)
 where
@@ -38,21 +65,21 @@ where
 		Left e = Left (TokenizerError (line, column) e)
 		Right length
 		# token = ((line, column), StringLiteral (subString (inc index) length stream))
-		= tokenize` {st & index = index + length + 2, column = column + length, tokens = [token : tokens]}
-	| isSymbol char = tokenize` {st & index = index + 1, column = column + 1, tokens = [((line, column), Symbol char) : tokens]}
-	| char == ' ' = tokenize` {st & index = index + 1, column = column + 1}
-	| char == '\t' = tokenize` {st & index = index + 1, column = column + 4}
-	| char == '\n' = tokenize` {st & index = index + 1, column = 1, line = line + 1}
+		= tokenize` $ putState 0 (length + 2) token st 
+	| isSymbol char = tokenize` $ putState 0 1 ((line, column), Symbol char) st
+	| char == ' ' = tokenize` $ advState 0 1 st
+	| char == '\t' = tokenize` $ advStateSep 1 0 4 st
+	| char == '\n' = tokenize` $ putStateSep 1 1 (column * -1) ((line, column), Symbol '\n') st
 	| isDigit char = case tokenizeDigit stream index of
 		Left e = Left (TokenizerError (line, column) e)
 		Right length
 		# token = ((line, column), Number (toInt (subString index length stream)))
-		= tokenize` {st & index = index + length, column = column + length, tokens = [token : tokens]}
+		= tokenize` $ putState 0 length token st
 	| isAlpha char || char == '_' = case tokenizeIdentifier stream index of
 		Left e = Left (TokenizerError (line, column) e)
 		Right length
 		# token = ((line, column), Identifier (subString index length stream))
-		= tokenize` {st & index = index + length, column = column + length, tokens = [token : tokens]}
+		= tokenize` $ putState 0 length token st
 	where
 		tokenizeIdentifier stream index
 		| index == size stream = Right 0

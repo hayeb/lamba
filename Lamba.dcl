@@ -7,5 +7,4 @@ import Lamba.Parser
 import Lamba.Language.Token
 import Lamba.Language.AST
 
-instance toString (TokenizerLocation, Token)
 instance == (Either a b) | == a & == b
