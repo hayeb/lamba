@@ -29,7 +29,7 @@ identifierTests = [ ("ID: Base", "test", Right [((1, 1), Identifier "test")])
 				  , ("ID: Multiple ", "test1 test2", Right [((1, 1), Identifier "test1"), ((1, 7), Identifier "test2")])
 				  , ("ID: Start with _", "_test", Right [((1, 1), Identifier "_test")])
 				  , ("ID: Random _", "_test_with_underscores_", Right [((1, 1), Identifier "_test_with_underscores_")])
-				  , ("ID: Multiple newline", "test1\ntest2", Right [((1, 1), Identifier "test1"), ((2, 1), Identifier "test2")])
+				  , ("ID: Multiple newline", "test1\ntest2", Right [((1, 1), Identifier "test1"), ((1, 6), Symbol '\n'), ((2, 1), Identifier "test2")])
 				 ]
 
 misc = [("Space", " ", Right [])

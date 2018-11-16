@@ -69,7 +69,7 @@ where
 	| isSymbol char = tokenize` $ putState 0 1 ((line, column), Symbol char) st
 	| char == ' ' = tokenize` $ advState 0 1 st
 	| char == '\t' = tokenize` $ advStateSep 1 0 4 st
-	| char == '\n' = tokenize` $ putStateSep 1 1 (column * -1) ((line, column), Symbol '\n') st
+	| char == '\n' = tokenize` $ putStateSep 1 1 (column * -1 + 1) ((line, column), Symbol '\n') st
 	| isDigit char = case tokenizeDigit stream index of
 		Left e = Left (TokenizerError (line, column) e)
 		Right length
