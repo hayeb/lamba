@@ -4,7 +4,7 @@ import Data.Either
 
 import Lamba.Tokenizer
 
-tokenizerTests :: [(String, String, Either TokenizerError [(TokenizerLocation, Token)])]
+tokenizerTests :: [(String, String, Either TokenizerError [(TokenLocation, Token)])]
 tokenizerTests = operatorTests ++ identifierTests ++ numberTests ++ misc
 
 

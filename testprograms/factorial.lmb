@@ -1,5 +1,6 @@
 fac :: Int -> Int
-fac 1 = 1
-fac n = n * fac (n - 1)
+fac n
+| n == 1 = 1
+| n = n * fac (n - 1)
 
 Main = fac 15

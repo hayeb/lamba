@@ -5,6 +5,12 @@ import Lamba.Language.Token
 
 import StdMisc, StdDebug
 
+dbTokenizer = False
+
+debug msg
+| dbTokenizer = trace_n msg False
+= False
+
 instance == TokenizerError
 where
 	(==) (TokenizerError l1 t1) (TokenizerError l2 t2) = l1 == l2  && t1 == t2
@@ -26,7 +32,7 @@ where
 	toString (IllegalCharacterIdentifier c) = "Illegal character in identifier: \'" + toString c + "\'"
 	toString (UnknownToken c) = "Unknown token: \'" + toString c + "\'"
 
-instance toString (TokenizerLocation, Token)
+instance toString (TokenLocation, Token)
 where
 	toString ((line, col), token) = "[" + toString line + ":" + toString col + "] " + toString token
 
@@ -36,7 +42,7 @@ putState lineInc colInc token state
 
 putStateSep :: Int Int Int ((Int, Int), Token) TokenizerState -> TokenizerState
 putStateSep indexInc lineInc colInc token state=:{index, line,column,tokens}
-| not (trace_tn ("putStateSep " + toString token) ) = undef
+| debug ("putStateSep " + toString token) = undef
 = {state & index = index + indexInc
   , line = line + lineInc
   , column = column + colInc
@@ -48,12 +54,12 @@ advState lineInc colInc state
 
 advStateSep :: Int Int Int TokenizerState -> TokenizerState
 advStateSep indexInc lineInc colInc state=:{index, line, column}
-| not (trace_tn ("advStateSep [" + toString lineInc + "," + toString colInc + "]")) = undef
+| debug ("advStateSep [" + toString lineInc + "," + toString colInc + "]") = undef
 = { state & index = index + indexInc
   , line = line + lineInc
   , column = column + colInc}
 
-tokenize :: String -> Either TokenizerError [(TokenizerLocation, Token)]
+tokenize :: String -> Either TokenizerError [(TokenLocation, Token)]
 tokenize s = tokenize` (newState s)
 where
 	newState string = {stream = string, index = 0, line = 1, column = 1, errors = [], tokens = []}
@@ -75,20 +81,17 @@ where
 		Right length
 		# token = ((line, column), Number (toInt (subString index length stream)))
 		= tokenize` $ putState 0 length token st
-	| isAlpha char || char == '_' = case tokenizeIdentifier stream index of
-		Left e = Left (TokenizerError (line, column) e)
-		Right length
+	| isAlpha char || char == '_'
+		# length = tokenizeIdentifier stream index
 		# token = ((line, column), Identifier (subString index length stream))
 		= tokenize` $ putState 0 length token st
 	where
 		tokenizeIdentifier stream index
-		| index == size stream = Right 0
+		| index == size stream = 0
 		# char = stream.[index]
-		| char == ' ' || char == '\t' || char == '\n' = Right 0
-		| char == '_' || isAlphanum char = case tokenizeIdentifier stream (inc index) of
-			Left e = Left e
-			Right l = Right (inc l)
-		= Left (IllegalCharacterIdentifier char)
+		| char == ' ' || char == '\t' || char == '\n' = 0
+		| char == '_' || isAlphanum char = inc (tokenizeIdentifier stream (inc index))
+		= 0
 
 		tokenizeDigit stream index
 		| index == size stream = Right 0

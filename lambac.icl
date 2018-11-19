@@ -3,9 +3,9 @@ module lambac
 import System.IO, System.File
 import StdEnv, ArgEnv
 import Data.Error
-import Control.Monad
-
-import qualified Text
+from Control.Monad import class Monad(..)
+import Control.Applicative
+import Text
 
 import Lamba
 
@@ -13,6 +13,7 @@ import Lamba
 				   , fileContents :: Maybe String
 				   , errors :: [String]
 				   , world :: !*World
+				   , console :: !*File
 				   }
 
 :: CompilerIO a = CIO (*CompilerState -> *(MaybeError String a, *CompilerState))
@@ -42,28 +43,39 @@ where
 			(Error e, cs) = (Error e, cs)
 			(Ok v, cs) = (Ok v,cs)
 
-compileError s = CIO \cs. (Error s, cs)
+compileError s = print s
+	>>| CIO \cs. (Error s, cs)
 
 getFileName = CIO \cs=:{fileName}. (Ok fileName, cs)
 getFileContents = CIO \cs=:{fileContents}. case fileContents of
 	Nothing = (Error "No file contents!", cs)
 	Just f = (Ok f, cs)
 
+print :: String -> CompilerIO ()
+print msg = CIO \cs=:{console}.
+	(Ok (), {cs & console = fwrites (msg + "\n") console})
+
 openFile :: CompilerIO String
 openFile = CIO \cs. case readFile cs.fileName cs.world of
 	(Error e, world) = (Error (toString e), {cs & world = world})
 	(Ok contents, world) = (Ok contents, {cs & fileContents = Just contents, world = world})
 
-initState filename world = {fileName = filename
-						   , fileContents = Nothing
-						   , errors = []
-						   , world = world}
+formatTokens :: [(TokenLocation, Token)] -> String
+formatTokens tokens = join "\n" (map toString tokens)
+
+initState filename world 
+# (console, world) = stdio world
+= { fileName = filename
+  , fileContents = Nothing
+  , errors = []
+  , world = world
+  , console = console}
 
 Start env = case main env of
-	(Error e, env) = execIO (print e) env
-	(Ok s, env) = execIO (print s) env
+	(Error e, env) = env
+	(Ok s, env) = env
 where
-	main :: *World -> (MaybeError String String, *World)
+	main :: *World -> (MaybeError String (), *World)
 	main world
 	# args = getCommandLine
 	| size args == 1 = (Error "Usage: lambac <FILENAME>", world)
@@ -79,7 +91,5 @@ where
 		>>= \tokens. case parse tokens of
 			Left e = compileError (toString e)
 			Right ast = pure ast
-		>>= \ast. pure "Parsing succeeded"
-
-
-
+		>>= \ast. print ("Parsing succeeded. AST: \n" + toString ast)
+		>>| return ()

@@ -1,6 +1,12 @@
 fib :: Int -> Int
 fib 0 = 1
 fib 1 = 1
-fib n = fin (n - 1) + fin (n - 2)
+fib n = (fib (n - 1)) + (fib (n - 2))
 
-Main = fib 15
+choose :: Bool -> String
+choose bool
+| bool = "true"
+| not bool = "false"
+
+Main :: Int
+Main = (fib 15, choose True)

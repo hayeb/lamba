@@ -4,6 +4,7 @@ import StdEnv, Data.Tuple, Data.Either, Text
 import Lamba
 
 import Lamba.Test.Tokenizer
+import Lamba.Test.Parser
 
 :: TokenizerTest = TokenizerTest Int Int
 

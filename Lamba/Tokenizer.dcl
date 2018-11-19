@@ -8,18 +8,17 @@ import Lamba.Language.Token
 	| IllegalCharacterIdentifier Char
 	| UnknownToken Char
 
-:: TokenizerLocation :== (Int, Int)
-:: TokenizerError = TokenizerError TokenizerLocation TokenizerErrorType
+:: TokenizerError = TokenizerError TokenLocation TokenizerErrorType
 
 :: TokenizerState = { stream :: String
 					, index :: Int
 					, line :: Int
 					, column :: Int
 					, errors :: [TokenizerError]
-					, tokens :: [(TokenizerLocation, Token)]}
+					, tokens :: [(TokenLocation, Token)]}
 
 instance == TokenizerError
 instance toString TokenizerError
-instance toString (TokenizerLocation, Token)
+instance toString (TokenLocation, Token)
 
-tokenize :: String -> Either TokenizerError [(TokenizerLocation, Token)]
+tokenize :: String -> Either TokenizerError [(TokenLocation, Token)]

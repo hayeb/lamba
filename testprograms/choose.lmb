@@ -1,6 +1,7 @@
 choose :: Bool -> String
 choose bool
 | bool = "true"
-| !bool = "false"
+| not bool = "false"
 
+Main :: Bool
 Main = choose True

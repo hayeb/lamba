@@ -8,5 +8,7 @@ import StdEnv
 	| CharacterLiteral Char
 	| Symbol Char
 
+:: TokenLocation :== (Int, Int)
+
 instance == Token
 instance toString Token

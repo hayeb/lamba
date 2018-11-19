@@ -12,8 +12,8 @@ Type ::= 'Bool'
 	| <Type> '->' <Type>
 
 FunctionBody ::= <Identifier> <Arguments>* <FunctionGuard>
-FunctionGuard ::= '\n|' Expr '=' Expr 
-	| '=' Expr
+FunctionGuard ::= '\n|' <Expr> '=' <Expr> <FunctionGuard>
+	| '=' <Expr>
 
 Expr1 ::= <Expr2> '||' <Expr2>
 	| <Expr2> '&&' <Expr2>
