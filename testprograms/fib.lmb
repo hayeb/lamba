@@ -8,5 +8,24 @@ choose bool
 | bool = "true"
 | not bool = "false"
 
+fst :: (Bool, Bool) -> Bool
+fst (l, r) = l
+
+snd :: (Bool, Bool) -> Bool
+snd (l, r) = r
+
+not :: Bool -> Bool
+not True = False
+not False = True
+
+w8even :: String -> String
+w8even s = s
+
+w7even :: Char -> Char
+w7even c = 'p'
+
+strTest :: (String, (Int, String)) -> String
+strTest (l, (n, r)) = (l + r) + toString n
+
 Main :: Int
 Main = (fib 15, choose True)

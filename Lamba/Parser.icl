@@ -24,6 +24,9 @@ db m val
 :: ParseResult a = Parsed a
 	| Failed ParseError
 
+isParsed (Parsed _) = True
+isParsed (Failed _) = False
+
 instance Functor ParseResult
 where
 	fmap f (Parsed a) = Parsed (f a)
@@ -34,9 +37,12 @@ where
 	fmap f (Parser a) = Parser \inp.  
 		[(fmap f res, tokens) \\ (res, tokens) <- a inp]
 
-instance Applicative Parser
+instance pure Parser
 where
 	pure a = Parser \inp. [(Parsed a, inp)]
+
+instance <*> Parser
+where
 	(<*>) (Parser fp) (Parser ap) = Parser \inp. 
 		[(apply f a, inp``) \\ (a, inp`) <- ap inp, (f, inp``) <- fp inp`]
 	where
@@ -54,7 +60,7 @@ where
 	
 instance toString ParseError
 where
-	toString (General error) = "ParseError: " +++ error
+	toString (General (l, c) error) = "[" + toString l + "," + toString c + "] Error: " +++ error
 
 zero = Parser \inp. []
 
@@ -63,15 +69,30 @@ item = Parser \inp. case inp of
 	[] = []
 	[t:ts] = [(Parsed t, ts)]
 
+// Returns the location of the next token
+loc = Parser \inp. case inp of
+	[] = []
+	ts=:[(loc, t):rs] = [(Parsed loc, ts)]
+
+locpeek = Parser \inp. case inp of
+	[] = []
+	ts=:[(loc, t):rs] = [(Parsed (loc, t), ts)]
+
 // Choice combinator: First tries the left parser. When if fails, tries the right.
+// Discards errors from the left side
 (<<|>) infixl 0 :: (Parser a) (Parser a) -> Parser a
 (<<|>) (Parser l) (Parser r) = Parser \inp. case l inp of
 	[] = r inp
-	ls = ls
+	ls = case [(pa, l) \\ (pa, l) <- ls | isParsed pa] of
+		[] = r inp
+		ls = ls
 
-err :: String -> Parser a
-err msg = Parser \inp. [(Failed (General msg), inp)]
-		
+err :: ParseError -> Parser a
+err err = Parser \inp. [(Failed err, inp)]
+
+strict :: (Parser a) ((TokenLocation, Token) -> ParseError) -> Parser a
+strict p onFail = p <<|> (locpeek >>= \tl. pure (onFail tl) >>= err)
+
 // Retrieves a token when it satisfies the predicate
 sat :: (Token -> Bool) -> Parser (TokenLocation, Token)
 sat p = item
@@ -79,10 +100,14 @@ sat p = item
 
 // zero or more items
 many :: (Parser a) -> Parser [a]
-many p = (p
-	>>= \i. many p
-	>>= \is. return [i : is])
-	<<|> return []
+many p 
+| debug "many items" = undef	
+= 
+		(p
+		>>= \i. many p
+		>>= \is. return [i : is])
+	<<|> 
+		return []
 
 // one or more items
 some :: (Parser a) -> Parser [a]
@@ -141,7 +166,12 @@ pType = pSimpleType
 			>>= \rest. db "Function type" (pure (TFunc lt rest)))
 		<<|> db "Non-function type" (pure lt))
 where
-	pSimpleType = pSpecificIdentifier "Bool" >>| pure TBool
+	pSimpleType = (pSymbol '(' 
+			>>| pType 
+			>>= \e. some (pSymbol ',' >>| pType) 
+			>>= \es. pSymbol ')'
+			>>| return (TTuple [e:es]))
+		<<|> pSpecificIdentifier "Bool" >>| pure TBool
 		<<|> pSpecificIdentifier "Int" >>| pure TInt
 		<<|> pSpecificIdentifier "Char" >>| pure TChar
 		<<|> pSpecificIdentifier "String" >>| pure TString
@@ -201,24 +231,24 @@ where
 	pTuple
 	= pSymbol '('
 		>>| db "parsed (" pExpr1
-		>>= \e1. pTuple`
+		>>= \e1. some (pSymbol ',' >>| pExpr1)
 		>>= \rest. pSymbol ')'
 		>>| return (TupleExpr [e1:rest])
-	where
-		pTuple` = some (pSymbol ',' >>| pExpr1)
 
 pFGuard :: Parser FGuard
 pFGuard 
 | debug "Parsing function guard" = undef
 = (pSymbols "\n|" 
-		>>| pExpr 
+		>>| loc
+		>>= \loc. pExpr 
 		>>= \ge. db  "Parsed guard left" (pSymbol '=') 
 		>>| pExpr 
-		>>= \re. db "Parsed guard right" (pure (Guarded ge re)))
+		>>= \re. db "Parsed guard right" (pure (Guarded loc ge re)))
 	<<|> (optionalNewline
 		>>| pSymbols "=" 
-		>>| pExpr 
-		>>= \e. pure (NonGuarded e))
+		>>| loc
+		>>= \loc. pExpr 
+		>>= \e. pure (NonGuarded loc e))
 
 pMatch :: Parser Match
 pMatch 
@@ -231,32 +261,27 @@ pMatch
 	<<|> (pSymbol '(' >>| tupleEls >>= \els. pSymbol ')' >>| return (MTuple els))
 where
 	tupleEls = pMatch 
-		>>= \e. pSymbol ','
-		>>| tupleEls`
+		>>= \e. some (pSymbol ',' >>| pMatch)
 		>>= \es. return [e : es]
-	where
-		tupleEls` = (pMatch
-			>>= \e. pSymbol ','
-			>>| tupleEls`
-			>>= \es. return [e : es])
-			<<|> return []
 
 pFBody :: String -> Parser FBody
 pFBody fname
 | debug "Parsing function body" = undef
-= pSpecificIdentifier fname
+= 	loc
+	>>= \loc. strict (pSpecificIdentifier fname) (\(l, t). General l ("Expected function body with name " + fname))
 	>>| db "Correct function name" (many pMatch)
 	>>= \arguments. db ("Parsed arguments [" + join " " (map toString arguments) + "]") (some pFGuard)
-	>>= \guards. pure (FBody arguments guards)
+	>>= \guards. pure (FBody loc arguments guards)
 
 pFDecl :: Parser FDecl
 pFDecl 
 | debug "Parsing function declaration" = undef
-= pIdentifier 
-	>>= \fName. db ("Got function name: " + fName) (pSymbols "::")
-	>>| db "Parsing type" pType
+=	loc
+	>>= \loc. strict pIdentifier (\(l, t). General l ("Expected function name, got " + toString t))
+	>>= \fName. db ("Got function name: " + fName) (strict (pSymbols "::") (\(l, t). General l ("Expected token \"::\", got " + toString t)))
+	>>| db "Parsing type" strict pType (\(l, t). General l ("Expected function type, got " + toString t))
 	>>= \fType. db ("Parsed type " + toString fType) (some ( pSymbol '\n' >>| pFBody fName))
-	>>= \fBody. pure (FDecl fName fType fBody)
+	>>= \fBody. pure (FDecl loc fName fType fBody)
 
 pAst :: Parser AST
 pAst = some (optionalNewline >>| pFDecl)
@@ -265,7 +290,7 @@ pAst = some (optionalNewline >>| pFDecl)
 parse :: [((Int, Int), Token)] -> Either ParseError AST
 parse inp = case pAst of
 	(Parser f) = case f inp of
-		[] = Left (General "Parsing failed")
+		[] = Left (General (0,0) "Parsing failed")
 		[(Parsed ast, _):_] = Right ast
 		[(Failed e,_):_] = Left e
 

@@ -10,6 +10,7 @@ where
 	toString TString = "String"
 	toString TVoid = "Void"
 	toString (TFunc f t) = toString f + " -> " + toString t
+	toString (TTuple els) = "(" + join ", " (map toString els) + ")"
 
 instance toString Match
 where
@@ -26,7 +27,7 @@ where
 
 instance toString FDecl
 where
-	toString (FDecl name type bodies) = name 
+	toString (FDecl _ name type bodies) = name 
 		+ " :: "
 		+ toString type
 		+ "\n"
@@ -35,14 +36,14 @@ where
 
 instance toString FBody
 where
-	toString (FBody [] guards) = concat (map toString guards)
-	toString (FBody matches guards)
+	toString (FBody _ [] guards) = concat (map toString guards)
+	toString (FBody _ matches guards)
 	= " " + join " " (map toString matches) + concat (map toString guards)
 
 instance toString FGuard
 where
-	toString (NonGuarded e) = " = " + toString e
-	toString (Guarded g e) = "\n| " 
+	toString (NonGuarded _ e) = " = " + toString e
+	toString (Guarded _ g e) = "\n| " 
 		+ toString g 
 		+ " = " 
 		+ toString e

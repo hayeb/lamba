@@ -7,6 +7,8 @@ import Lamba.Language.Token
 :: TokenizerErrorType = IllegalCharacterDigit Char
 	| IllegalCharacterIdentifier Char
 	| UnknownToken Char
+	| CharNotTerminated
+	| StringNotTerminated
 
 :: TokenizerError = TokenizerError TokenLocation TokenizerErrorType
 

@@ -20,6 +20,8 @@ where
 	(==) (IllegalCharacterDigit t1) (IllegalCharacterDigit t2) = t1 == t2
 	(==) (IllegalCharacterIdentifier t1) (IllegalCharacterIdentifier t2) = t1 == t2
 	(==) (UnknownToken t1) (UnknownToken t2) = t1 == t2
+	(==) (CharNotTerminated) (CharNotTerminated) = True
+	(==) (StringNotTerminated) (StringNotTerminated) = True
 	(==) _  _ = False
 
 instance toString TokenizerError
@@ -31,6 +33,8 @@ where
 	toString (IllegalCharacterDigit c) = "Illegal character in digit: \'" + toString c + "\'"
 	toString (IllegalCharacterIdentifier c) = "Illegal character in identifier: \'" + toString c + "\'"
 	toString (UnknownToken c) = "Unknown token: \'" + toString c + "\'"
+	toString CharNotTerminated = "Character literal not terminated; Are you missing a \'?"
+	toString StringNotTerminated = "String literal not terminated; Are you missing a \"?"
 
 instance toString (TokenLocation, Token)
 where
@@ -72,6 +76,11 @@ where
 		Right length
 		# token = ((line, column), StringLiteral (subString (inc index) length stream))
 		= tokenize` $ putState 0 (length + 2) token st 
+	| isCharStart char = case tokenizeCharLiteral stream (inc index) of
+		Left e = Left (TokenizerError (line, column) e)
+		Right c
+		# token = ((line, column), CharacterLiteral (stream.[inc index]))
+		= tokenize` $ putState 0 3 token st
 	| isSymbol char = tokenize` $ putState 0 1 ((line, column), Symbol char) st
 	| char == ' ' = tokenize` $ advState 0 1 st
 	| char == '\t' = tokenize` $ advStateSep 1 0 4 st
@@ -104,14 +113,23 @@ where
 		= Right 0
 
 		tokenizeStringLiteral stream index
-		| index == size stream = Right 0
+		| index == size stream = Left StringNotTerminated
 		# char = stream.[index]
 		| isStringStart char = Right 0
 		= case tokenizeStringLiteral stream (inc index) of
 			Left e = Left e
 			Right l = Right (inc l)
 
+		tokenizeCharLiteral stream index
+		| index == size stream || index == size stream + 1 = Left CharNotTerminated
+		# char = stream.[index]
+		| stream.[index + 1] <> '\'' = Left CharNotTerminated
+		= Right char 
+
 	isSymbol c = (c >= '!' && c <= '/' || c >= ':' && c <= '?' || c >= '[' && c <= '`' || c >= '{' && c <= '~') && not (c == '_')
 
 	isStringStart '"' = True
 	isStringStart _ = False
+
+	isCharStart '\'' = True
+	isCharStart _ = False

@@ -2,20 +2,23 @@ definition module Lamba.Language.AST
 
 import StdEnv
 
+:: SourceLocation :== (Int, Int)
+
 :: AST = AST [FDecl]
 
-:: FDecl = FDecl String Type [FBody]
+:: FDecl = FDecl SourceLocation String Type [FBody]
 
-:: FBody = FBody [Match] [FGuard]
+:: FBody = FBody SourceLocation [Match] [FGuard]
 
-:: FGuard = NonGuarded Expr
-	| Guarded Expr Expr
+:: FGuard = NonGuarded SourceLocation Expr
+	| Guarded SourceLocation Expr Expr
 
 :: Type = TBool
 	| TInt
 	| TChar
 	| TString
 	| TVoid
+	| TTuple [Type]
 	| TFunc Type Type
 
 :: Match = MVar String

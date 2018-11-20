@@ -1,6 +1,6 @@
 module lambac
 
-import System.IO, System.File
+import System.File
 import StdEnv, ArgEnv
 import Data.Error
 from Control.Monad import class Monad(..)
@@ -10,11 +10,10 @@ import Text
 import Lamba
 
 :: *CompilerState = { fileName :: String
-				   , fileContents :: Maybe String
-				   , errors :: [String]
-				   , world :: !*World
-				   , console :: !*File
-				   }
+				    , fileContents :: Maybe String
+				    , world :: !*World
+				    , console :: !*File
+				    }
 
 :: CompilerIO a = CIO (*CompilerState -> *(MaybeError String a, *CompilerState))
 
@@ -24,9 +23,12 @@ where
 		(Error e, cs) = (Error e, cs)
 		(Ok a, cs) = (Ok (f a), cs)
 
-instance Applicative CompilerIO
+instance pure CompilerIO
 where
 	pure a = CIO \cs. (Ok a, cs)
+
+instance <*> CompilerIO
+where
 	(<*>) (CIO f) (CIO a) = CIO \cs. case f cs of
 		(Error e, cs) = (Error e, cs)
 		(Ok h, cs) = case a cs of
@@ -45,6 +47,9 @@ where
 
 compileError s = print s
 	>>| CIO \cs. (Error s, cs)
+
+compileInfo s v = print s
+	>>| CIO \cs. (Ok v, cs)
 
 getFileName = CIO \cs=:{fileName}. (Ok fileName, cs)
 getFileContents = CIO \cs=:{fileContents}. case fileContents of
@@ -67,29 +72,32 @@ initState filename world
 # (console, world) = stdio world
 = { fileName = filename
   , fileContents = Nothing
-  , errors = []
   , world = world
   , console = console}
 
-Start env = case main env of
-	(Error e, env) = env
-	(Ok s, env) = env
+Start env = main env
 where
-	main :: *World -> (MaybeError String (), *World)
+	main :: *World -> *World
 	main world
 	# args = getCommandLine
-	| size args == 1 = (Error "Usage: lambac <FILENAME>", world)
+	| size args == 1 
+		# (console, world) = stdio world
+		# console = fwrites "Usage: lambac <FILENAME>\n" console
+		= closeConsole console world
 	# (CIO f) = compile
 	= case f (initState args.[1] world) of
-		(Error e, {world}) = (Error e, world)
-		(Ok result, {world}) = (Ok result, world)
+		(_, {console, world}) = closeConsole console world
 
 	compile = openFile
 		>>= \contents. case tokenize contents of
 			Left e = compileError (toString e)
-			Right tokens = pure tokens
+			Right tokens = compileInfo ("Tokens: " + formatTokens tokens) tokens
 		>>= \tokens. case parse tokens of
 			Left e = compileError (toString e)
 			Right ast = pure ast
 		>>= \ast. print ("Parsing succeeded. AST: \n" + toString ast)
 		>>| return ()
+
+	closeConsole console world
+	# (_, world) = fclose console world
+	= world
