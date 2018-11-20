@@ -1,2 +1,2 @@
-12 :: String
+Main :: String
 Main = "Hello, world!"
