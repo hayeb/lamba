@@ -62,6 +62,11 @@ instance toString ParseError
 where
 	toString (General (l, c) error) = "[" + toString l + "," + toString c + "] Error: " +++ error
 
+instance toString (ParseResult a)
+where
+	toString (Failed err) = "Failed " + toString err
+	toString (Parsed _) = "Parsed"
+
 zero = Parser \inp. []
 
 // Returns a token from the stream if available.
@@ -86,6 +91,11 @@ locpeek = Parser \inp. case inp of
 	ls = case [(pa, l) \\ (pa, l) <- ls | isParsed pa] of
 		[] = r inp
 		ls = ls
+
+(<|>) infixl 0 :: (Parser a) (Parser a) -> Parser a
+(<|>) (Parser l) (Parser r) = Parser \inp. case l inp of
+	[] = trace_n "No results from LHS" r inp
+	ls = trace_n ("Results from LHS" + join " " (map (toString o fst) ls)) ls
 
 err :: ParseError -> Parser a
 err err = Parser \inp. [(Failed err, inp)]
@@ -240,11 +250,11 @@ pFGuard
 | debug "Parsing function guard" = undef
 = (pSymbols "\n|" 
 		>>| loc
-		>>= \loc. pExpr 
+		>>= \loc. strict pExpr (\(l, t). General l "Could not parse guard LHS")
 		>>= \ge. db  "Parsed guard left" (pSymbol '=') 
 		>>| pExpr 
 		>>= \re. db "Parsed guard right" (pure (Guarded loc ge re)))
-	<<|> (optionalNewline
+	<|> (optionalNewline
 		>>| pSymbols "=" 
 		>>| loc
 		>>= \loc. pExpr 
@@ -281,7 +291,8 @@ pFDecl
 	>>= \fName. db ("Got function name: " + fName) (strict (pSymbols "::") (\(l, t). General l ("Expected token \"::\", got " + toString t)))
 	>>| db "Parsing type" strict pType (\(l, t). General l ("Expected function type, got " + toString t))
 	>>= \fType. db ("Parsed type " + toString fType) (some ( pSymbol '\n' >>| pFBody fName))
-	>>= \fBody. pure (FDecl loc fName fType fBody)
+	>>= \fBody. optionalNewline
+	>>| pure (FDecl loc fName fType fBody)
 
 pAst :: Parser AST
 pAst = some (optionalNewline >>| pFDecl)
@@ -291,6 +302,7 @@ parse :: [((Int, Int), Token)] -> Either ParseError AST
 parse inp = case pAst of
 	(Parser f) = case f inp of
 		[] = Left (General (0,0) "Parsing failed")
-		[(Parsed ast, _):_] = Right ast
+		[(Parsed ast, []):_] = Right ast
+		[(Parsed ast, [(l, t): _]):_] = Left (General l ("Unexpected token: " + toString t))
 		[(Failed e,_):_] = Left e
 
