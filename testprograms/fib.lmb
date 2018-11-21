@@ -14,18 +14,24 @@ fst (l, r) = l
 snd :: (Bool, Bool) -> Bool
 snd (l, r) = r
 
+seq :: String -> String -> Bool
+seq l r = ((l == r) && (l == r)) && (fib 18) == (fib 14)
+
 not :: Bool -> Bool
 not True = False
 not False = True
 
+test :: Bool
+test = True
+
 w8even :: String -> String
-w8even s = s
+w8even s  = s
 
 w7even :: Char -> Char
 w7even c = 'p'
 
 strTest :: (String, (Int, String)) -> String
-strTest (l, (n, r)) = (l + r) + toString n
+strTest (l, (n, r)) = l
 
 Main :: Int
 Main = (fib 15, choose True)

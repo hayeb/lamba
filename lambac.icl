@@ -68,6 +68,17 @@ openFile = CIO \cs. case readFile cs.fileName cs.world of
 formatTokens :: [(TokenLocation, Token)] -> String
 formatTokens tokens = join "\n" (map toString tokens)
 
+formatTypes :: [(String, SourceLocation, Type)] -> String
+formatTypes types = join "\n" (map (\(name, (line, col), type). "[" 
+	+ toString line 
+	+ ":" 
+	+ toString col 
+	+ "] " 
+	+ name 
+	+ ": " 
+	+ toString type) 
+	types)
+
 initState filename world 
 # (console, world) = stdio world
 = { fileName = filename
@@ -96,6 +107,9 @@ where
 			Error e = compileError (toString e)
 			Ok ast = pure ast
 		>>= \ast. print ("Parsing succeeded. AST: \n" + toString ast)
+		>>| case typecheck ast of
+			Error e = compileError (join "\n" (map toString e))
+			Ok types = print ("Types: " + formatTypes types)
 		>>| return ()
 
 	closeConsole console world

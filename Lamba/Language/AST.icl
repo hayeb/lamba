@@ -15,9 +15,9 @@ where
 instance toString Match
 where
 	toString (MVar s) = s 
-	toString (MNum i) = toString i
+	toString (MInt i) = toString i
 	toString (MString s) = "\"" + s + "\""
-	toString (MChar c) = "\' " + toString c + "\'"
+	toString (MChar c) = "\'" + toString c + "\'"
 	toString (MBool b) = toString b 
 	toString (MTuple els) = "(" + join ", " (map toString els) + ")"
 

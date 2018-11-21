@@ -267,7 +267,7 @@ pMatch
 	<<|> (pString >>= \str. return (MString str))
 	<<|> (pChar >>= \char. return (MChar char))
 	<<|> (pBool >>= \bool. return (MBool bool))
-	<<|> (pNumber >>= \num. return (MNum num))
+	<<|> (pNumber >>= \num. return (MInt num))
 	<<|> (pSymbol '(' >>| tupleEls >>= \els. pSymbol ')' >>| return (MTuple els))
 where
 	tupleEls = pMatch 

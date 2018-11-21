@@ -22,7 +22,7 @@ import StdEnv
 	| TFunc Type Type
 
 :: Match = MVar String
-	| MNum Int
+	| MInt Int
 	| MString String
 	| MChar Char
 	| MBool Bool
