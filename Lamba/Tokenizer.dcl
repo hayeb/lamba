@@ -1,7 +1,7 @@
 definition module Lamba.Tokenizer
 
 import StdEnv
-import Data.Either
+import Data.Error
 import Lamba.Language.Token
 
 :: TokenizerErrorType = IllegalCharacterDigit Char
@@ -23,4 +23,4 @@ instance == TokenizerError
 instance toString TokenizerError
 instance toString (TokenLocation, Token)
 
-tokenize :: String -> Either TokenizerError [(TokenLocation, Token)]
+tokenize :: String -> MaybeError TokenizerError [(TokenLocation, Token)]

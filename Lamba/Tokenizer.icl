@@ -1,6 +1,6 @@
 implementation module Lamba.Tokenizer
 
-import Data.Either, Text, StdChar, Data.Func
+import  Data.Error, Text, StdChar, Data.Func
 import Lamba.Language.Token
 
 import StdMisc, StdDebug
@@ -63,22 +63,22 @@ advStateSep indexInc lineInc colInc state=:{index, line, column}
   , line = line + lineInc
   , column = column + colInc}
 
-tokenize :: String -> Either TokenizerError [(TokenLocation, Token)]
+tokenize :: String -> MaybeError TokenizerError [(TokenLocation, Token)]
 tokenize s = tokenize` (newState s)
 where
 	newState string = {stream = string, index = 0, line = 1, column = 1, errors = [], tokens = []}
 
 	tokenize` st=:{stream, index, line, column, errors, tokens}
-	| index == size stream = Right (reverse tokens)
+	| index == size stream = Ok (reverse tokens)
 	# char = stream.[index]
 	| isStringStart char = case tokenizeStringLiteral stream (inc index) of
-		Left e = Left (TokenizerError (line, column) e)
-		Right length
+		Error e = Error (TokenizerError (line, column) e)
+		Ok length
 		# token = ((line, column), StringLiteral (subString (inc index) length stream))
 		= tokenize` $ putState 0 (length + 2) token st 
 	| isCharStart char = case tokenizeCharLiteral stream (inc index) of
-		Left e = Left (TokenizerError (line, column) e)
-		Right c
+		Error e = Error (TokenizerError (line, column) e)
+		Ok c
 		# token = ((line, column), CharacterLiteral (stream.[inc index]))
 		= tokenize` $ putState 0 3 token st
 	| isSymbol char = tokenize` $ putState 0 1 ((line, column), Symbol char) st
@@ -86,8 +86,8 @@ where
 	| char == '\t' = tokenize` $ advStateSep 1 0 4 st
 	| char == '\n' = tokenize` $ putStateSep 1 1 (column * -1 + 1) ((line, column), Symbol '\n') st
 	| isDigit char = case tokenizeDigit stream index of
-		Left e = Left (TokenizerError (line, column) e)
-		Right length
+		Error e = Error (TokenizerError (line, column) e)
+		Ok length
 		# token = ((line, column), Number (toInt (subString index length stream)))
 		= tokenize` $ putState 0 length token st
 	| isAlpha char || char == '_'
@@ -103,28 +103,28 @@ where
 		= 0
 
 		tokenizeDigit stream index
-		| index == size stream = Right 0
+		| index == size stream = Ok 0
 		# char = stream.[index]
-		| char == ' ' || char == '\t' || char == '\n' = Right 0
+		| char == ' ' || char == '\t' || char == '\n' = Ok 0
 		| isDigit char = case tokenizeDigit stream (inc index) of
-			Left e = Left e
-			Right l = Right (inc l)
-		| isAlpha char = Left (IllegalCharacterDigit char)
-		= Right 0
+			Error e = Error e
+			Ok l = Ok (inc l)
+		| isAlpha char = Error (IllegalCharacterDigit char)
+		= Ok 0
 
 		tokenizeStringLiteral stream index
-		| index == size stream = Left StringNotTerminated
+		| index == size stream = Error StringNotTerminated
 		# char = stream.[index]
-		| isStringStart char = Right 0
+		| isStringStart char = Ok 0
 		= case tokenizeStringLiteral stream (inc index) of
-			Left e = Left e
-			Right l = Right (inc l)
+			Error e = Error e
+			Ok l = Ok (inc l)
 
 		tokenizeCharLiteral stream index
-		| index == size stream || index == size stream + 1 = Left CharNotTerminated
+		| index == size stream || index == size stream + 1 = Error CharNotTerminated
 		# char = stream.[index]
-		| stream.[index + 1] <> '\'' = Left CharNotTerminated
-		= Right char 
+		| stream.[index + 1] <> '\'' = Error CharNotTerminated
+		= Ok char 
 
 	isSymbol c = (c >= '!' && c <= '/' || c >= ':' && c <= '?' || c >= '[' && c <= '`' || c >= '{' && c <= '~') && not (c == '_')
 

@@ -90,11 +90,11 @@ where
 
 	compile = openFile
 		>>= \contents. case tokenize contents of
-			Left e = compileError (toString e)
-			Right tokens = compileInfo ("Tokens: " + formatTokens tokens) tokens
+			Error e = compileError (toString e)
+			Ok tokens = compileInfo ("Tokens: " + formatTokens tokens) tokens
 		>>= \tokens. case parse tokens of
-			Left e = compileError (toString e)
-			Right ast = pure ast
+			Error e = compileError (toString e)
+			Ok ast = pure ast
 		>>= \ast. print ("Parsing succeeded. AST: \n" + toString ast)
 		>>| return ()
 

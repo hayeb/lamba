@@ -1,6 +1,6 @@
 definition module Lamba.Parser
 
-import Data.Either
+import Data.Error
 
 import Lamba.Language.Token
 import Lamba.Language.AST
@@ -8,4 +8,4 @@ import Lamba.Language.AST
 :: ParseError = General (Int, Int) String
 instance toString ParseError
 
-parse :: [((Int, Int), Token)] -> Either ParseError AST
+parse :: [((Int, Int), Token)] -> MaybeError ParseError AST

@@ -2,7 +2,7 @@ implementation module Lamba.Parser
 
 from Control.Monad import class Monad(..) 
 import Control.Applicative
-import Data.Either, Data.Error, Data.Functor
+import Data.Error, Data.Functor
 
 import Lamba.Language.Token
 import Lamba.Language.AST
@@ -298,11 +298,11 @@ pAst :: Parser AST
 pAst = some (optionalNewline >>| pFDecl)
 	>>= \fdecls. pure (AST fdecls)
 
-parse :: [((Int, Int), Token)] -> Either ParseError AST
+parse :: [((Int, Int), Token)] -> MaybeError ParseError AST
 parse inp = case pAst of
 	(Parser f) = case f inp of
-		[] = Left (General (0,0) "Parsing failed")
-		[(Parsed ast, []):_] = Right ast
-		[(Parsed ast, [(l, t): _]):_] = Left (General l ("Unexpected token: " + toString t))
-		[(Failed e,_):_] = Left e
+		[] = Error (General (0,0) "Parsing failed")
+		[(Parsed ast, []):_] = Ok ast
+		[(Parsed ast, [(l, t): _]):_] = Error (General l ("Unexpected token: " + toString t))
+		[(Failed e,_):_] = Error e
 
