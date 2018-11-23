@@ -51,5 +51,5 @@ pow :: Int -> Int -> Int
 pow _ 0 = 1
 pow n p = p * (pow n (p - 1))
 
-Main :: (Int, String, String)
+Main :: (Int, String, String, Int)
 Main = (fib 15, choose True, strTest ("bla", (15, "bleh")), hd [1 : [2:[]]])

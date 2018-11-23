@@ -176,7 +176,6 @@ checkExpr loc (StringExpr s) TString env = Ok 'DM'.newMap
 checkExpr loc (CharExpr c) TChar env = Ok 'DM'.newMap
 checkExpr loc (BoolExpr b) TBool env = Ok 'DM'.newMap
 checkExpr loc (Nested expr) t env = checkExpr loc expr t env
-
 checkExpr loc (EmptyList) _ env = Ok 'DM'.newMap
 checkExpr loc (ListExpr e es) (TList t) env
 | not (trace_tn ("Checking list expression element " + toString e)) = undef
