@@ -33,6 +33,7 @@ w7even c = 'p'
 strTest :: (String, (Int, String)) -> String
 strTest (l, (n, r)) = l
 
+// This is a test
 hd :: [Int] -> Int
 hd [] = 0
 hd [h:rest] = h

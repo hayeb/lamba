@@ -23,7 +23,7 @@ where
 	toString TVoid = "TVoid"
 	toString (TFunc f t) = bracket ("TFunc " + toString f + " " + toString t)
 	toString (TTuple els) = bracket ("TTuple " + join ", " (map toString els))
-	toString (TList t) = bracket ("TList" + toString t)
+	toString (TList t) = bracket ("TList " + toString t)
 
 instance toString Match
 where

@@ -71,6 +71,8 @@ where
 	tokenize` st=:{stream, index, line, column, errors, tokens}
 	| index == size stream = Ok (reverse tokens)
 	# char = stream.[index]
+	| isCommentStart char stream index = let commentLength = tokenizeComment stream index in
+		tokenize` $ advStateSep commentLength 1 (column * -1 + 1) st
 	| isStringStart char = case tokenizeStringLiteral stream (inc index) of
 		Error e = Error (TokenizerError (line, column) e)
 		Ok length
@@ -126,6 +128,12 @@ where
 		| stream.[index + 1] <> '\'' = Error CharNotTerminated
 		= Ok char 
 
+		tokenizeComment stream index
+		| index == size stream = 0
+		# char = stream.[index]
+		| char == '\n' = 0
+		= inc (tokenizeComment stream (inc index))
+
 	isSymbol c = (c >= '!' && c <= '/' || c >= ':' && c <= '?' || c >= '[' && c <= '`' || c >= '{' && c <= '~') && not (c == '_')
 
 	isStringStart '"' = True
@@ -133,3 +141,9 @@ where
 
 	isCharStart '\'' = True
 	isCharStart _ = False
+
+	isCommentStart '/' stream index
+	| inc index >= size stream = False
+	| stream.[inc index] == '/' = True
+	= False
+	isCommentStart _ _ _ = False
