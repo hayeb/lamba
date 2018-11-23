@@ -4,7 +4,7 @@ import Data.Error
 
 import Lamba.Language.AST
 
-:: TEnv :== [(String, SourceLocation, Type)]
+:: TEnv :== [(String, (SourceLocation, Type))]
 :: TypeError = TypeError SourceLocation String
 
 instance toString TypeError

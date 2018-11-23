@@ -68,8 +68,8 @@ openFile = CIO \cs. case readFile cs.fileName cs.world of
 formatTokens :: [(TokenLocation, Token)] -> String
 formatTokens tokens = join "\n" (map toString tokens)
 
-formatTypes :: [(String, SourceLocation, Type)] -> String
-formatTypes types = join "\n" (map (\(name, (line, col), type). "[" 
+formatTypes :: [(String, (SourceLocation, Type))] -> String
+formatTypes types = join "\n" (map (\(name, ((line, col), type)). "[" 
 	+ toString line 
 	+ ":" 
 	+ toString col 

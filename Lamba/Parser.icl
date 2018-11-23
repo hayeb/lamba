@@ -181,6 +181,10 @@ where
 			>>= \e. some (pSymbol ',' >>| pType) 
 			>>= \es. pSymbol ')'
 			>>| return (TTuple [e:es]))
+		<<|> (pSymbol '['
+			>>| pType
+			>>= \t. pSymbol ']'
+			>>| return (TList t))
 		<<|> pSpecificIdentifier "Bool" >>| pure TBool
 		<<|> pSpecificIdentifier "Int" >>| pure TInt
 		<<|> pSpecificIdentifier "Char" >>| pure TChar
@@ -193,57 +197,81 @@ pExpr
 = pExpr1
 where
 	pExpr1 :: Parser Expr
-	pExpr1 = pExpr2 
-		>>= \l. ((pSymbols "||" >>= \_. pExpr2 >>= \r. pure (OrExpr l r))
-			<<|> (pSymbols "&&" >>= \_.  pExpr2 >>= \r. pure (AndExpr l r)))
-			<<|> return l
+	pExpr1 = pList
+		<<|> pExpr2
 
 	pExpr2 :: Parser Expr
 	pExpr2 = pExpr3 
-		>>= \l. ((pSymbols "==" >>= \_. pExpr3 >>= \r. pure (EqExpr l r))
-			<<|> (pSymbols "<=" >>= \_.  pExpr3 >>= \r. pure (LeqExpr l r))
-			<<|> (pSymbols ">=" >>= \_.  pExpr3 >>= \r. pure (GeqExpr l r))
-			<<|> (pSymbols "!=" >>= \_.  pExpr3 >>= \r. pure (NeqExpr l r))
-			<<|> (pSymbol '<' >>= \_.  pExpr3 >>= \r. pure (LesserExpr l r))
-			<<|> (pSymbol '>' >>= \_.  pExpr3 >>= \r. pure (GreaterExpr l r))
+		>>= \l. ((pSymbols "||" >>= \_. pExpr3 >>= \r. pure (OrExpr l r))
+			<<|> (pSymbols "&&" >>= \_.  pExpr3 >>= \r. pure (AndExpr l r)))
+			<<|> return l
+
+	pExpr3 :: Parser Expr
+	pExpr3 = pExpr4 
+		>>= \l. ((pSymbols "==" >>= \_. pExpr4 >>= \r. pure (EqExpr l r))
+			<<|> (pSymbols "<=" >>= \_.  pExpr4 >>= \r. pure (LeqExpr l r))
+			<<|> (pSymbols ">=" >>= \_.  pExpr4 >>= \r. pure (GeqExpr l r))
+			<<|> (pSymbols "!=" >>= \_.  pExpr4 >>= \r. pure (NeqExpr l r))
+			<<|> (pSymbol '<' >>= \_.  pExpr4 >>= \r. pure (LesserExpr l r))
+			<<|> (pSymbol '>' >>= \_.  pExpr4 >>= \r. pure (GreaterExpr l r))
 			<<|> return l
 			)
 	
-	pExpr3 :: Parser Expr
-	pExpr3 = pExpr4
-		>>= \l. ((pSymbol '+' >>| pExpr4 >>= \r. pure (PlusExpr l r))
-			<<|> (pSymbol '-' >>| pExpr4 >>= \r. pure (MinusExpr l r))
+	pExpr4 :: Parser Expr
+	pExpr4 = pExpr5
+		>>= \l. ((pSymbol '+' >>| pExpr5 >>= \r. pure (PlusExpr l r))
+			<<|> (pSymbol '-' >>| pExpr5 >>= \r. pure (MinusExpr l r))
 			<<|> return l
 			)
 
-	pExpr4 :: Parser Expr
-	pExpr4 = pExpr5
-		>>= \l. ((pSymbol '*' >>| pExpr5 >>= \r. pure (TimesExpr l r))
-			<<|> (pSymbol '/' >>| pExpr5 >>= \r. pure (DivideExpr l r))
-			<<|> (pSymbol '%' >>| pExpr5 >>= \r. pure (ModuloExpr l r))
+	pExpr5 :: Parser Expr
+	pExpr5 = pExpr6
+		>>= \l. ((pSymbol '*' >>| pExpr6 >>= \r. pure (TimesExpr l r))
+			<<|> (pSymbol '/' >>| pExpr6 >>= \r. pure (DivideExpr l r))
+			<<|> (pSymbol '%' >>| pExpr6 >>= \r. pure (ModuloExpr l r))
 			<<|> return l)
 	
-	pExpr5 :: Parser Expr
-	pExpr5 = (pNumber >>= \n. return (NumberExpr n))
+	pExpr6 :: Parser Expr
+	pExpr6 = (pNumber >>= \n. return (NumberExpr n))
 		<<|> (pString >>= \s. return (StringExpr s))
 		<<|> (pChar >>= \c. return (CharExpr c))
-		<<|> (pSpecificIdentifier "True" >>| return (BoolExpr True))
-		<<|> (pSpecificIdentifier "False" >>| return (BoolExpr False))
+		<<|> (pBool >>= \b. return (BoolExpr b))
 		<<|> (pSymbol '(' 
 			>>| pExpr1 
 			>>= \sub. pSymbol ')' 
 			>>| return (Nested sub))
 		<<|> pTuple
-		<<|> (pIdentifier 
-			>>= \fName. many pExpr1 
-			>>= \args. return (FuncExpr fName args))
-	
+		<<|> pAppl
+
 	pTuple
 	= pSymbol '('
 		>>| db "parsed (" pExpr1
 		>>= \e1. some (pSymbol ',' >>| pExpr1)
 		>>= \rest. pSymbol ')'
 		>>| return (TupleExpr [e1:rest])
+
+	pList :: Parser Expr
+	pList = 
+		(pSymbol '[' >>| pSymbol ']' >>| return (EmptyList))
+		<<|> (pSymbol '[' 
+			>>| pExpr1 
+			>>= \e. pSymbol ':' 
+			>>| pList 
+			>>= \es. pSymbol ']' 
+			>>| return (ListExpr e es))
+
+	pAppl
+	| debug "Parsing function application" = undef
+	= pIdentifier
+		>>= \func. many pArgument
+		>>= \args. return (FuncExpr func args)
+	where
+		pArgument = (pNumber >>= \n. return (NumberExpr n))
+			<<|> (pString >>= \s. return (StringExpr s))
+			<<|> (pChar >>= \c. return (CharExpr c))
+			<<|> (pBool >>= \b. return (BoolExpr b))
+			<<|> (pIdentifier >>= \id. return (FuncExpr id [])) 
+			<<|> (pSymbol '(' >>| pExpr1 >>= \re. pSymbol ')' >>| return re)
 
 pFGuard :: Parser FGuard
 pFGuard 
@@ -269,11 +297,20 @@ pMatch
 	<<|> (pBool >>= \bool. return (MBool bool))
 	<<|> (pNumber >>= \num. return (MInt num))
 	<<|> (pSymbol '(' >>| tupleEls >>= \els. pSymbol ')' >>| return (MTuple els))
+	<<|> pMatchList
 where
 	tupleEls = pMatch 
 		>>= \e. some (pSymbol ',' >>| pMatch)
-		>>= \es. return [e : es]
+		>>= \es. return [e : es] 
 
+	pMatchList = (pSymbols "[]" >>| return MEmptyList)
+		<<|> (pSymbol '[' 
+			>>| pMatch 
+			>>= \m. pSymbol ':' 
+			>>| pMatch
+			>>= \es. pSymbol ']' 
+			>>| return (MList m es))
+			
 pFBody :: String -> Parser FBody
 pFBody fname
 | debug "Parsing function body" = undef

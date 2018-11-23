@@ -15,7 +15,7 @@ snd :: (Bool, Bool) -> Bool
 snd (l, r) = r
 
 seq :: String -> String -> Bool
-seq l r = ((l == r) && (l == r)) && (fib 18) == (fib 14)
+seq l r = (l == r && l == r) && fib 18 == fib 14
 
 not :: Bool -> Bool
 not True = False
@@ -33,5 +33,22 @@ w7even c = 'p'
 strTest :: (String, (Int, String)) -> String
 strTest (l, (n, r)) = l
 
-Main :: Int
+hd :: [Int] -> Int
+hd [] = 0
+hd [h:rest] = h
+
+tl :: [Int] -> [Int]
+tl [] = []
+tl [l : ls] = ls
+
+last :: [Int] -> Int
+last [] = 0
+last [l : []] = l
+last [l : ls] = last ls
+
+pow :: Int -> Int -> Int
+pow _ 0 = 1
+pow n p = p * (pow n (p - 1))
+
+Main :: (Int, String)
 Main = (fib 15, choose True)

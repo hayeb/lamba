@@ -18,7 +18,8 @@ import StdEnv
 	| TChar
 	| TString
 	| TVoid
-	| TTuple [Type]
+	| TTuple [Type] 
+	| TList Type
 	| TFunc Type Type
 
 :: Match = MVar String
@@ -27,6 +28,8 @@ import StdEnv
 	| MChar Char
 	| MBool Bool
 	| MTuple [Match]
+	| MEmptyList
+	| MList Match Match
 
 :: Expr = OrExpr Expr Expr
 	| AndExpr Expr Expr
@@ -49,6 +52,9 @@ import StdEnv
 	| BoolExpr Bool
 	| Nested Expr
 	| TupleExpr [Expr]
+	| ListExpr Expr Expr
+	| EmptyList
 	| FuncExpr String [Expr]
 
 instance toString Type, Match, AST, FDecl, FBody, FGuard, Expr
+instance == Type

@@ -1,0 +1,6 @@
+hd :: [Int] -> Int
+hd [] = 0
+hd [l : ls] = l
+
+Main :: Int
+Main = hd [1 : [2 : [3 : []]]]
