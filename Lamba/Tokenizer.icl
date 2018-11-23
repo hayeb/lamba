@@ -131,19 +131,23 @@ where
 		tokenizeComment stream index
 		| index == size stream = 0
 		# char = stream.[index]
-		| char == '\n' = 0
+		| char == '\n' = 1
 		= inc (tokenizeComment stream (inc index))
 
-	isSymbol c = (c >= '!' && c <= '/' || c >= ':' && c <= '?' || c >= '[' && c <= '`' || c >= '{' && c <= '~') && not (c == '_')
+		isSymbol c = (c >= '!' && c <= '/' 
+				|| c >= ':' && c <= '?' 
+				|| c >= '[' && c <= '`' 
+				|| c >= '{' && c <= '~') 
+			&& not (c == '_')
 
-	isStringStart '"' = True
-	isStringStart _ = False
+		isStringStart '"' = True
+		isStringStart _ = False
 
-	isCharStart '\'' = True
-	isCharStart _ = False
+		isCharStart '\'' = True
+		isCharStart _ = False
 
-	isCommentStart '/' stream index
-	| inc index >= size stream = False
-	| stream.[inc index] == '/' = True
-	= False
-	isCommentStart _ _ _ = False
+		isCommentStart '/' stream index
+		| inc index >= size stream = False
+		| stream.[inc index] == '/' = True
+		= False
+		isCommentStart _ _ _ = False

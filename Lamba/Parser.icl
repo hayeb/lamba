@@ -270,6 +270,8 @@ where
 			<<|> (pString >>= \s. return (StringExpr s))
 			<<|> (pChar >>= \c. return (CharExpr c))
 			<<|> (pBool >>= \b. return (BoolExpr b))
+			<<|> pList
+			<<|> pTuple
 			<<|> (pIdentifier >>= \id. return (FuncExpr id [])) 
 			<<|> (pSymbol '(' >>| pExpr1 >>= \re. pSymbol ')' >>| return re)
 
