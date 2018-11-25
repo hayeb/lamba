@@ -1,6 +1,6 @@
 implementation module Lamba.Parser
 
-from Control.Monad import class Monad(..) 
+from Control.Monad import class Monad(..)
 import Control.Applicative
 import Data.Error, Data.Functor
 
@@ -20,12 +20,18 @@ db m val
 = val
 
 :: TokenList :== [(TokenLocation, Token)]
-:: Parser a = Parser (TokenList -> [(ParseResult a, TokenList)])
+:: ParserState = {tokens :: TokenList
+	, indent :: Int}
+
+:: Parser a = Parser (ParserState -> [(ParseResult a, ParserState)])
 :: ParseResult a = Parsed a
 	| Failed ParseError
 
 isParsed (Parsed _) = True
 isParsed (Failed _) = False
+
+isFail (Parsed _) = False
+isFail (Failed _) = True
 
 instance Functor ParseResult
 where
@@ -34,7 +40,7 @@ where
 
 instance Functor Parser
 where
-	fmap f (Parser a) = Parser \inp.  
+	fmap f (Parser a) = Parser \inp.
 		[(fmap f res, tokens) \\ (res, tokens) <- a inp]
 
 instance pure Parser
@@ -43,7 +49,7 @@ where
 
 instance <*> Parser
 where
-	(<*>) (Parser fp) (Parser ap) = Parser \inp. 
+	(<*>) (Parser fp) (Parser ap) = Parser \inp.
 		[(apply f a, inp``) \\ (a, inp`) <- ap inp, (f, inp``) <- fp inp`]
 	where
 		apply (Parsed f) a = fmap f a
@@ -51,13 +57,13 @@ where
 
 instance Monad Parser
 where
-	bind (Parser pa) pfa = Parser \inp. 
+	bind (Parser pa) pfa = Parser \inp.
 		[(b, input``) \\ (a, input`) <- pa inp, (b, input``) <- bind` pfa a input`]
 	where
 		bind` pfa (Parsed r) input = case pfa r of
 			(Parser f) = f input
 		bind` pfa (Failed e) input = [(Failed e, input)]
-	
+
 instance toString ParseError
 where
 	toString (General (l, c) error) = "[" + toString l + "," + toString c + "] Error: " +++ error
@@ -70,18 +76,24 @@ where
 zero = Parser \inp. []
 
 // Returns a token from the stream if available.
-item = Parser \inp. case inp of
+item = Parser \st=:{tokens}. case tokens of
 	[] = []
-	[t:ts] = [(Parsed t, ts)]
+	[t:ts] = [(Parsed t, {st & tokens = ts})]
 
 // Returns the location of the next token
-loc = Parser \inp. case inp of
+loc = Parser \st=:{tokens}. case tokens of
 	[] = []
-	ts=:[(loc, t):rs] = [(Parsed loc, ts)]
+	ts=:[(loc, t):rs] = [(Parsed loc, st)]
 
-locpeek = Parser \inp. case inp of
+locpeek = Parser \st=:{tokens}. case tokens of
 	[] = []
-	ts=:[(loc, t):rs] = [(Parsed (loc, t), ts)]
+	ts=:[(loc, t):rs] = [(Parsed (loc, t), st)]
+
+indent = Parser \st=:{indent}. [(Parsed indent, st)]
+
+incIndent = Parser \st=:{indent}. [(Parsed (inc indent), {st & indent = inc (indent)})]
+
+decIndent = Parser \st=:{indent}. [(Parsed (dec indent), {st & indent = dec (indent)})]
 
 // Choice combinator: First tries the left parser. When if fails, tries the right.
 // Discards errors from the left side
@@ -110,25 +122,25 @@ sat p = item
 
 // zero or more items
 many :: (Parser a) -> Parser [a]
-many p 
-| debug "many items" = undef	
-= 
+many p
+| debug "many items" = undef
+=
 		(p
 		>>= \i. many p
 		>>= \is. return [i : is])
-	<<|> 
+	<<|>
 		return []
 
 // one or more items
 some :: (Parser a) -> Parser [a]
 some p = p
 	>>= \i. many p
-	>>= \is. return [i : is] 
+	>>= \is. return [i : is]
 
 // Skip an optional newline
 optionalNewline :: Parser [Char]
 optionalNewline = many (pSymbol '\n')
-	
+
 // Parse an identifier
 pIdentifier :: Parser String
 pIdentifier = sat (\t. case t of (Identifier s) = True; _ = False)
@@ -166,19 +178,19 @@ pSymbols cs = symbols` (fromString cs)
 where
 	symbols` [] = pure []
 	symbols` [c:cs] = pSymbol c
-		>>= \c. symbols` cs 
+		>>= \c. symbols` cs
 
 pType :: Parser Type
-pType = pSimpleType 
-	>>= \lt. ((pSymbols "->" 
+pType = pSimpleType
+	>>= \lt. ((pSymbols "->"
 			>>| optionalNewline
 			>>| pType
 			>>= \rest. db "Function type" (pure (TFunc lt rest)))
 		<<|> db "Non-function type" (pure lt))
 where
-	pSimpleType = (pSymbol '(' 
-			>>| pType 
-			>>= \e. some (pSymbol ',' >>| pType) 
+	pSimpleType = (pSymbol '('
+			>>| pType
+			>>= \e. some (pSymbol ',' >>| pType)
 			>>= \es. pSymbol ')'
 			>>| return (TTuple [e:es]))
 		<<|> (pSymbol '['
@@ -192,7 +204,7 @@ where
 		<<|> pSpecificIdentifier "Void" >>| pure TVoid
 
 pExpr :: Parser Expr
-pExpr 
+pExpr
 | debug "parsing expression" = undef
 = pExpr1
 where
@@ -201,13 +213,13 @@ where
 		<<|> pExpr2
 
 	pExpr2 :: Parser Expr
-	pExpr2 = pExpr3 
+	pExpr2 = pExpr3
 		>>= \l. ((pSymbols "||" >>= \_. pExpr3 >>= \r. pure (OrExpr l r))
 			<<|> (pSymbols "&&" >>= \_.  pExpr3 >>= \r. pure (AndExpr l r)))
 			<<|> return l
 
 	pExpr3 :: Parser Expr
-	pExpr3 = pExpr4 
+	pExpr3 = pExpr4
 		>>= \l. ((pSymbols "==" >>= \_. pExpr4 >>= \r. pure (EqExpr l r))
 			<<|> (pSymbols "<=" >>= \_.  pExpr4 >>= \r. pure (LeqExpr l r))
 			<<|> (pSymbols ">=" >>= \_.  pExpr4 >>= \r. pure (GeqExpr l r))
@@ -216,7 +228,7 @@ where
 			<<|> (pSymbol '>' >>= \_.  pExpr4 >>= \r. pure (GreaterExpr l r))
 			<<|> return l
 			)
-	
+
 	pExpr4 :: Parser Expr
 	pExpr4 = pExpr5
 		>>= \l. ((pSymbol '+' >>| pExpr5 >>= \r. pure (PlusExpr l r))
@@ -230,17 +242,18 @@ where
 			<<|> (pSymbol '/' >>| pExpr6 >>= \r. pure (DivideExpr l r))
 			<<|> (pSymbol '%' >>| pExpr6 >>= \r. pure (ModuloExpr l r))
 			<<|> return l)
-	
+
 	pExpr6 :: Parser Expr
 	pExpr6 = (pNumber >>= \n. return (NumberExpr n))
 		<<|> (pString >>= \s. return (StringExpr s))
 		<<|> (pChar >>= \c. return (CharExpr c))
 		<<|> (pBool >>= \b. return (BoolExpr b))
-		<<|> (pSymbol '(' 
-			>>| pExpr1 
-			>>= \sub. pSymbol ')' 
+		<<|> (pSymbol '('
+			>>| pExpr1
+			>>= \sub. pSymbol ')'
 			>>| return (Nested sub))
 		<<|> pTuple
+		<<|> pCaseExpr
 		<<|> pAppl
 
 	pTuple
@@ -251,13 +264,13 @@ where
 		>>| return (TupleExpr [e1:rest])
 
 	pList :: Parser Expr
-	pList = 
+	pList =
 		(pSymbol '[' >>| pSymbol ']' >>| return (EmptyList))
-		<<|> (pSymbol '[' 
-			>>| pExpr1 
-			>>= \e. pSymbol ':' 
-			>>| pList 
-			>>= \es. pSymbol ']' 
+		<<|> (pSymbol '['
+			>>| pExpr1
+			>>= \e. pSymbol ':'
+			>>| pList
+			>>= \es. pSymbol ']'
 			>>| return (ListExpr e es))
 
 	pAppl
@@ -272,26 +285,47 @@ where
 			<<|> (pBool >>= \b. return (BoolExpr b))
 			<<|> pList
 			<<|> pTuple
-			<<|> (pIdentifier >>= \id. return (FuncExpr id [])) 
+			<<|> (pIdentifier >>= \id. return (FuncExpr id []))
 			<<|> (pSymbol '(' >>| pExpr1 >>= \re. pSymbol ')' >>| return re)
 
+	pCaseExpr :: Parser Expr
+	pCaseExpr
+	| debug "Parse CaseExpr" = undef
+	= pSpecificIdentifier "match"
+		>>| db "got match keyword" pExpr
+		>>= \e. db ("Got expr to match: " + toString e) (strict (pSymbol ':') (\(l, t). General l ("Expected symbol ':' after case expression, got " +++ toString t)))
+		>>| incIndent
+		>>= \indent. strict (some (pCaseRule indent)) (\(l, t). General l ("Expected at least one case rule, got " +++ toString t))
+		>>= \rules. decIndent
+		>>| return (CaseExpr e rules)
+	where
+		pCaseRule :: Int -> Parser MatchRule
+		pCaseRule currentIndent
+		| debug "parsing case rule" = undef
+		= pSymbol '\n'
+			>>| db ("Parsing rule with indentation " + toString currentIndent) (pSymbols (join "" (repeatn currentIndent "\t")))
+			>>| db "Got correct indentation" pMatch
+			>>= \match. db "Parsed match rule LHS" (pSymbols "->")
+			>>| pExpr
+			>>= \expr. return (MatchRule match expr)
+
 pFGuard :: Parser FGuard
-pFGuard 
+pFGuard
 | debug "Parsing function guard" = undef
-= (pSymbols "\n|" 
+= (pSymbols "\n|"
 		>>| loc
 		>>= \loc. strict pExpr (\(l, t). General l "Could not parse guard LHS")
-		>>= \ge. db  "Parsed guard left" (pSymbol '=') 
-		>>| pExpr 
+		>>= \ge. db  "Parsed guard left" (pSymbol '=')
+		>>| pExpr
 		>>= \re. db "Parsed guard right" (pure (Guarded loc ge re)))
 	<|> (optionalNewline
-		>>| pSymbols "=" 
+		>>| pSymbols "="
 		>>| loc
-		>>= \loc. pExpr 
+		>>= \loc. pExpr
 		>>= \e. pure (NonGuarded loc e))
 
 pMatch :: Parser Match
-pMatch 
+pMatch
 | debug "Parsing function match" = undef
 = (pIdentifier >>= \id. return (MVar id))
 	<<|> (pString >>= \str. return (MString str))
@@ -301,18 +335,18 @@ pMatch
 	<<|> (pSymbol '(' >>| tupleEls >>= \els. pSymbol ')' >>| return (MTuple els))
 	<<|> pMatchList
 where
-	tupleEls = pMatch 
+	tupleEls = pMatch
 		>>= \e. some (pSymbol ',' >>| pMatch)
-		>>= \es. return [e : es] 
+		>>= \es. return [e : es]
 
 	pMatchList = (pSymbols "[]" >>| return MEmptyList)
-		<<|> (pSymbol '[' 
-			>>| pMatch 
-			>>= \m. pSymbol ':' 
+		<<|> (pSymbol '['
 			>>| pMatch
-			>>= \es. pSymbol ']' 
+			>>= \m. pSymbol ':'
+			>>| pMatch
+			>>= \es. pSymbol ']'
 			>>| return (MList m es))
-			
+
 pFBody :: String -> Parser FBody
 pFBody fname
 | debug "Parsing function body" = undef
@@ -323,7 +357,7 @@ pFBody fname
 	>>= \guards. pure (FBody loc arguments guards)
 
 pFDecl :: Parser FDecl
-pFDecl 
+pFDecl
 | debug "Parsing function declaration" = undef
 =	loc
 	>>= \loc. strict pIdentifier (\(l, t). General l ("Expected function name, got " + toString t))
@@ -338,10 +372,15 @@ pAst = some (optionalNewline >>| pFDecl)
 	>>= \fdecls. pure (AST fdecls)
 
 parse :: [((Int, Int), Token)] -> MaybeError ParseError AST
-parse inp = case pAst of
-	(Parser f) = case f inp of
+parse inp
+# initialState = {tokens = inp, indent = 0}
+= case pAst of
+	(Parser f) = case f initialState of
 		[] = Error (General (0,0) "Parsing failed")
-		[(Parsed ast, []):_] = Ok ast
-		[(Parsed ast, [(l, t): _]):_] = Error (General l ("Unexpected token: " + toString t))
+		[(Parsed ast, {tokens}):rest] = case tokens of
+			[] = Ok ast
+			[(l, t): _] = case filter isFail (map fst rest) of
+				[] = Error (General l ("Unexpected token :" +++ toString t))
+				[(Failed e):es] = (Error e)
 		[(Failed e,_):_] = Error e
 

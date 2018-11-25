@@ -15,6 +15,7 @@ import Lamba
 				    , console :: !*File
 				    }
 
+// We use uniqueness to guarantee we never pass the wrong state.
 :: CompilerIO a = CIO (*CompilerState -> *(MaybeError String a, *CompilerState))
 
 instance Functor CompilerIO
@@ -41,9 +42,7 @@ where
 		(Error e, cs) = (Error e, cs)
 		(Ok val, cs)
 		# (CIO f)= fCIOB val
-		= case f cs of
-			(Error e, cs) = (Error e, cs)
-			(Ok v, cs) = (Ok v,cs)
+		= f cs
 
 compileError s = print s
 	>>| CIO \cs. (Error s, cs)
@@ -69,17 +68,17 @@ formatTokens :: [(TokenLocation, Token)] -> String
 formatTokens tokens = join "\n" (map toString tokens)
 
 formatTypes :: [(String, (SourceLocation, Type))] -> String
-formatTypes types = join "\n" (map (\(name, ((line, col), type)). "[" 
-	+ toString line 
-	+ ":" 
-	+ toString col 
-	+ "] " 
-	+ name 
-	+ ": " 
-	+ toString type) 
+formatTypes types = join "\n" (map (\(name, ((line, col), type)). "["
+	+ toString line
+	+ ":"
+	+ toString col
+	+ "] "
+	+ name
+	+ ": "
+	+ toString type)
 	types)
 
-initState filename world 
+initState filename world
 # (console, world) = stdio world
 = { fileName = filename
   , fileContents = Nothing
@@ -91,7 +90,7 @@ where
 	main :: *World -> *World
 	main world
 	# args = getCommandLine
-	| size args == 1 
+	| size args == 1
 		# (console, world) = stdio world
 		# console = fwrites "Usage: lambac <FILENAME>\n" console
 		= closeConsole console world

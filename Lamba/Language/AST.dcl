@@ -55,6 +55,9 @@ import StdEnv
 	| ListExpr Expr Expr
 	| EmptyList
 	| FuncExpr String [Expr]
+	| CaseExpr Expr [MatchRule]
 
-instance toString Type, Match, AST, FDecl, FBody, FGuard, Expr
+:: MatchRule = MatchRule Match Expr
+
+instance toString Type, Match, AST, FDecl, FBody, FGuard, Expr, MatchRule
 instance == Type

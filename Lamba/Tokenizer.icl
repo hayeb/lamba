@@ -77,7 +77,7 @@ where
 		Error e = Error (TokenizerError (line, column) e)
 		Ok length
 		# token = ((line, column), StringLiteral (subString (inc index) length stream))
-		= tokenize` $ putState 0 (length + 2) token st 
+		= tokenize` $ putState 0 (length + 2) token st
 	| isCharStart char = case tokenizeCharLiteral stream (inc index) of
 		Error e = Error (TokenizerError (line, column) e)
 		Ok c
@@ -85,7 +85,7 @@ where
 		= tokenize` $ putState 0 3 token st
 	| isSymbol char = tokenize` $ putState 0 1 ((line, column), Symbol char) st
 	| char == ' ' = tokenize` $ advState 0 1 st
-	| char == '\t' = tokenize` $ advStateSep 1 0 4 st
+	| char == '\t' = tokenize` $ putStateSep 1 0 4 ((line, column), Symbol '\t') st
 	| char == '\n' = tokenize` $ putStateSep 1 1 (column * -1 + 1) ((line, column), Symbol '\n') st
 	| isDigit char = case tokenizeDigit stream index of
 		Error e = Error (TokenizerError (line, column) e)
@@ -126,7 +126,7 @@ where
 		| index == size stream || index == size stream + 1 = Error CharNotTerminated
 		# char = stream.[index]
 		| stream.[index + 1] <> '\'' = Error CharNotTerminated
-		= Ok char 
+		= Ok char
 
 		tokenizeComment stream index
 		| index == size stream = 0
@@ -134,10 +134,10 @@ where
 		| char == '\n' = 1
 		= inc (tokenizeComment stream (inc index))
 
-		isSymbol c = (c >= '!' && c <= '/' 
-				|| c >= ':' && c <= '?' 
-				|| c >= '[' && c <= '`' 
-				|| c >= '{' && c <= '~') 
+		isSymbol c = (c >= '!' && c <= '/'
+				|| c >= ':' && c <= '?'
+				|| c >= '[' && c <= '`'
+				|| c >= '{' && c <= '~')
 			&& not (c == '_')
 
 		isStringStart '"' = True

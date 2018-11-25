@@ -38,6 +38,11 @@ hd :: [Int] -> Int
 hd [] = 0
 hd [h:rest] = h
 
+otherHd :: [Int] -> Int
+otherHd l = match l:
+	[] -> o
+	[h:rest] -> h
+
 tl :: [Int] -> [Int]
 tl [] = []
 tl [l : ls] = ls

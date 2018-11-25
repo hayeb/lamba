@@ -31,10 +31,10 @@ typecheck (AST decls)
 # fEnv = 'DM'.fromList (map (\(FDecl loc name type _). (name, (loc, type))) decls)
 # res = map (checkFunctionDeclaration fEnv) decls
 = case fErrors res of
-	[] = Ok ('DM'.toList (fResults res)) 
+	[] = Ok ('DM'.toList (fResults res))
 	es = Error es
 
-checkFunctionDeclaration :: ITEnv FDecl 
+checkFunctionDeclaration :: ITEnv FDecl
 	-> MaybeError [TypeError] ITEnv
 checkFunctionDeclaration fEnv (FDecl loc name type bodies)
 | not (trace_tn ("Checking function declaration " + name)) = undef
@@ -47,34 +47,34 @@ checkFunctionBody :: String Type FBody ITEnv
 	-> MaybeError [TypeError] ITEnv
 checkFunctionBody name ft=:(TFunc _ _) (FBody loc args guards) env
 | not (trace_tn "Checking function body") = undef
-| not (correctArity ft args) 
-	= singleError loc ("Function body " 
-		+ name 
-		+ " does not have the correct number of arguments. (Required: " 
-		+ toString (arity ft) 
-		+ ", found: " 
-		+ toString (length args) 
+| not (correctArity ft args)
+	= singleError loc ("Function body "
+		+ name
+		+ " does not have the correct number of arguments. (Required: "
+		+ toString (arity ft)
+		+ ", found: "
+		+ toString (length args)
 		+ ")")
-= case checkMatch loc ft args of 
+= case checkMatch loc ft args of
 	Error e = Error e
 	Ok env`
 	# env = 'DM'.union env env`
 	# res = map (\g. checkGuard g env (returnType ft)) guards
-	= case fErrors res of 
+	= case fErrors res of
 		[] = Ok (fResults res)
 		es = Error es
 
 // A simple function which takes no arguments, but arguments were specified.
 checkFunctionBody name _ (FBody loc args=:[a:as] guards) env
-	= singleError loc ("Function " 
-		+ name 
-		+ " does not take arguments, but found " 
-		+ toString (length args) 
+	= singleError loc ("Function "
+		+ name
+		+ " does not take arguments, but found "
+		+ toString (length args)
 		+ " arguments")
 
 checkFunctionBody name simpleType (FBody loc _ guards) env
 | not (trace_tn ("Checking function body " + name + " with simple type " + toString simpleType)) = undef
-# res = map (\g. checkGuard g env simpleType) guards 
+# res = map (\g. checkGuard g env simpleType) guards
 = case fErrors res of
 	[] = Ok (fResults res)
 	es = Error es
@@ -86,7 +86,7 @@ correctArity (TFunc l r) [a : as] = correctArity r as
 correctArity _ [a : as] = False
 
 arity :: Type -> Int
-arity (TFunc l r) = inc (arity r) 
+arity (TFunc l r) = inc (arity r)
 arity _ = 0
 
 returnType :: Type -> Type
@@ -102,45 +102,45 @@ checkMatch loc (TFunc l r) [m : ms]
 # res = checkSpecificArgument loc l m
 # res` = checkMatch loc r ms
 = comb res res`
-		
+
 checkSpecificArgument :: SourceLocation Type Match
 	-> MaybeError [TypeError] ITEnv
 // A variable can have any type
-checkSpecificArgument loc t (MVar name) 
+checkSpecificArgument loc t (MVar name)
 | not (trace_tn ("Var " + name + " has type " + toString t)) = undef
 = Ok ('DM'.fromList [(name, (loc, t))])
 // Lists
 checkSpecificArgument loc (TList type) MEmptyList = Ok 'DM'.newMap
-checkSpecificArgument loc (TList type) (MList e es) 
+checkSpecificArgument loc (TList type) (MList e es)
 # res = checkSpecificArgument loc type e
 # res` = checkSpecificArgument loc (TList type) es
 = comb res res`
 
 // Tuples
 checkSpecificArgument _ (TTuple []) (MTuple []) = Ok 'DM'.newMap
-checkSpecificArgument loc (TTuple [e:es]) (MTuple [m:ms]) 
+checkSpecificArgument loc (TTuple [e:es]) (MTuple [m:ms])
 # res = checkSpecificArgument loc e m
 # res` = checkSpecificArgument loc (TTuple es) (MTuple ms)
 = comb res res`
 
-checkSpecificArgument loc (TTuple _) match 
+checkSpecificArgument loc (TTuple _) match
 	= singleError loc ("Expected argument of type Tuple, got " + toString match)
 
 // Basic types
 checkSpecificArgument loc TBool (MBool val) = Ok 'DM'.newMap
-checkSpecificArgument loc TBool match 
+checkSpecificArgument loc TBool match
 	= singleError loc ("Expected match of type Bool, got " + toString match)
 
 checkSpecificArgument loc TInt (MInt val) = Ok 'DM'.newMap
-checkSpecificArgument loc TInt match 
+checkSpecificArgument loc TInt match
 	= singleError loc ("Expected match of type Int, got " + toString match)
 
 checkSpecificArgument loc TChar (MChar val) = Ok 'DM'.newMap
-checkSpecificArgument loc TChar match 
+checkSpecificArgument loc TChar match
 	= singleError loc ("Expected match of type Char, got " + toString match)
 
 checkSpecificArgument loc TString (MString val) = Ok 'DM'.newMap
-checkSpecificArgument loc TString match 
+checkSpecificArgument loc TString match
 	= singleError loc ("Expected match of type String, got " + toString match)
 
 checkGuard :: FGuard ITEnv Type -> MaybeError [TypeError] ITEnv
@@ -155,7 +155,7 @@ checkExpr loc (EqExpr e1 e2) TBool env
 # results = [(r1, r2) \\ t <- [TInt, TChar, TBool, TString]
 			, r1 <- [checkExpr loc e1 t env]
 			, r2 <- [checkExpr loc e2 t env]]
-= case filter (\(l, r). isOk l && isOk r) results of 
+= case filter (\(l, r). isOk l && isOk r) results of
 	[] = singleError loc "Expected == operands of type Int, Char, Bool, String"
 	_ = Ok 'DM'.newMap
 
@@ -200,11 +200,11 @@ checkExpr loc (FuncExpr f es) desiredType env
 # ft = 'DM'.get f env
 | isNothing ft = singleError loc ("Function " + f + " is undefined")
 # (loc, functionType) = fromJust ft
-| desiredType <> returnType functionType = singleError loc ("Function application " 
+| desiredType <> returnType functionType = singleError loc ("Function application "
 	+ f
-	+ " has incorrect return type. Expected:\n\t" 
-	+ toString desiredType 
-	+ "\nGot\n\t" 
+	+ " has incorrect return type. Expected:\n\t"
+	+ toString desiredType
+	+ "\nGot\n\t"
 	+ toString (returnType functionType))
 = checkFunctionApplication loc es functionType env
 

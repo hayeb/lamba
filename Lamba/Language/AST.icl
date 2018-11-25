@@ -36,13 +36,17 @@ where
 	toString MEmptyList = "MEmptyList"
 	toString (MList e es) = bracket ("MList " + toString e + " " + toString es)
 
+instance toString MatchRule
+where
+	toString (MatchRule match expr) = bracket ("MatchRule " + toString match + " " + toString expr)
+
 instance toString AST
 where
 	toString (AST functions) = join "\n" (map toString functions)
 
 instance toString FDecl
 where
-	toString (FDecl _ name type bodies) = name 
+	toString (FDecl _ name type bodies) = name
 		+ " :: "
 		+ toString type
 		+ "\n"
@@ -58,9 +62,9 @@ where
 instance toString FGuard
 where
 	toString (NonGuarded _ e) = " = " + toString e
-	toString (Guarded _ g e) = "\n| " 
-		+ toString g 
-		+ " = " 
+	toString (Guarded _ g e) = "\n| "
+		+ toString g
+		+ " = "
 		+ toString e
 
 instance toString Expr
@@ -90,5 +94,6 @@ where
 	toString (ListExpr e rest) = bracket ("ListExpr " + toString e + " " + toString rest)
 	toString (FuncExpr fName []) = bracket ("VariableExpr " + fName)
 	toString (FuncExpr fName args) = bracket ("FuncExpr " + fName + " " + join " " (map toString args))
-		
+	toString (CaseExpr expr rules) = bracket ("MatchExpr " + toString expr + " " + join " " (map toString rules))
+
 bracket s = "(" + s + ")"
