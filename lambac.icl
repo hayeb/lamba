@@ -9,6 +9,8 @@ import Text
 
 import Lamba
 
+from Data.Map import toList, toAscList, foldrWithKey
+
 :: *CompilerState = { fileName :: String
 				    , fileContents :: Maybe String
 				    , world :: !*World
@@ -67,8 +69,8 @@ openFile = CIO \cs. case readFile cs.fileName cs.world of
 formatTokens :: [(TokenLocation, Token)] -> String
 formatTokens tokens = join "\n" (map toString tokens)
 
-formatTypes :: [(String, (SourceLocation, Type))] -> String
-formatTypes types = join "\n" (map (\(name, ((line, col), type)). "["
+formatTypes :: (Map SourceLocation (String, Type)) -> String
+formatTypes types = join "\n" (map (\((line, col), (name, type)). "["
 	+ toString line
 	+ ":"
 	+ toString col
@@ -76,7 +78,7 @@ formatTypes types = join "\n" (map (\(name, ((line, col), type)). "["
 	+ name
 	+ ": "
 	+ toString type)
-	types)
+	(toList types))
 
 initState filename world
 # (console, world) = stdio world
@@ -106,7 +108,7 @@ where
 			Error e = compileError (toString e)
 			Ok ast = pure ast
 		>>= \ast. print ("Parsing succeeded. AST: \n" + toString ast)
-		>>| case typecheck ast of
+		>>| case infer ast of
 			Error e = compileError (join "\n" (map toString e))
 			Ok types = print ("Types: " + formatTypes types)
 		>>| return ()

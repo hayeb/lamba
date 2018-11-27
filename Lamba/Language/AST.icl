@@ -1,18 +1,20 @@
 implementation module Lamba.Language.AST
 
-import StdEnv, Text
+import StdEnv, Text, StdMaybe, Data.GenEq
+
+derive gEq Type
+
+instance == SourceLocation
+where
+	(==) l1 l2 = l1 === l2
+
+instance < SourceLocation
+where
+	(<) (l1, c1) (l2, c2) = l1 < l2 || c1 < c2
 
 instance == Type
 where
-	(==) TBool TBool = True
-	(==) TInt TInt = True
-	(==) TChar TChar = True
-	(==) TString TString = True
-	(==) TVoid TVoid = True
-	(==) (TFunc f1 t1) (TFunc f2 t2) = f1 == f2 && t1 == t2
-	(==) (TTuple els1) (TTuple els2) = els1 == els2
-	(==) (TList t1) (TList t2) = t1 == t2
-	(==) _ _ = False
+	(==) t1 t2 = t1 === t2
 
 instance toString Type
 where
@@ -21,6 +23,7 @@ where
 	toString TChar = "TChar"
 	toString TString = "TString"
 	toString TVoid = "TVoid"
+	toString (TVar v) = "TVar " + toString v
 	toString (TFunc f t) = bracket ("TFunc " + toString f + " " + toString t)
 	toString (TTuple els) = bracket ("TTuple " + join ", " (map toString els))
 	toString (TList t) = bracket ("TList " + toString t)
@@ -38,7 +41,7 @@ where
 
 instance toString MatchRule
 where
-	toString (MatchRule match expr) = bracket ("MatchRule " + toString match + " " + toString expr)
+	toString (MatchRule loc match expr) = bracket (toString loc + " MatchRule " + toString match + " " + toString expr)
 
 instance toString AST
 where
@@ -46,12 +49,14 @@ where
 
 instance toString FDecl
 where
-	toString (FDecl _ name type bodies) = name
+	toString (FDecl _ name (Just type) bodies) = name
 		+ " :: "
 		+ toString type
 		+ "\n"
 		+ join "\n" (map (\b. name + toString b) bodies)
 		+ "\n"
+
+	toString (FDecl _ name Nothing bodies) = name + "\n" + join "\n" (map (\b. name + toString b) bodies) + "\n"
 
 instance toString FBody
 where
@@ -69,31 +74,40 @@ where
 
 instance toString Expr
 where
-	toString (OrExpr e1 e2) = bracket ("OrExpr " + toString e1 + " " + toString e2)
-	toString (AndExpr e1 e2) = bracket ("AndExpr " + toString e1 + " " + toString e2)
-	toString (NotExpr e) = bracket ("NotExpr" + toString e)
-	toString (EqExpr e1 e2) = bracket ("EqExpr " + toString e1 + " " + toString e2)
-	toString (LeqExpr e1 e2) = bracket ("LeqExpr " + toString e1 + " " + toString e2)
-	toString (GeqExpr e1 e2) = bracket ("GeqExpr " + toString e1 + " " + toString e2)
-	toString (NeqExpr e1 e2) = bracket ("NeqExpr " + toString e1 + " " + toString e2)
-	toString (LesserExpr e1 e2) = bracket ("LesserExpr " + toString e1 + " " + toString e2)
-	toString (GreaterExpr e1 e2) = bracket ("GreaterExpr " + toString e1 + " " + toString e2)
-	toString (PlusExpr e1 e2) = bracket ("PlusExpr " + toString e1 + " " + toString e2)
-	toString (MinusExpr e1 e2) = bracket ("MinusExpr " + toString e1 + " " + toString e2)
-	toString (NegExpr e) = bracket ("NeqExpr " + toString e)
-	toString (TimesExpr e1 e2) = bracket ("TimesExpr " + toString e1 + " " + toString e2)
-	toString (DivideExpr e1 e2) = bracket ("DivideExpr " + toString e1 + " " + toString e2)
-	toString (ModuloExpr e1 e2) = bracket ("ModuloExpr " + toString e1 + " " + toString e2)
-	toString (NumberExpr n) = bracket ("NumberExpr " + toString n)
-	toString (StringExpr s) = bracket ("Stringexpr " + s)
-	toString (CharExpr c) = "\'" + toString c + "\'"
-	toString (BoolExpr b) = bracket ("BoolExpr " + toString b)
-	toString (Nested e) = bracket ("NestedExpr " + toString e)
-	toString (TupleExpr els) = bracket ("TupleExpr " + join " " (map toString els))
-	toString EmptyList = "EmptyList"
-	toString (ListExpr e rest) = bracket ("ListExpr " + toString e + " " + toString rest)
-	toString (FuncExpr fName []) = bracket ("VariableExpr " + fName)
-	toString (FuncExpr fName args) = bracket ("FuncExpr " + fName + " " + join " " (map toString args))
-	toString (CaseExpr expr rules) = bracket ("MatchExpr " + toString expr + " " + join " " (map toString rules))
+	toString (OrExpr loc e1 e2) = bracket (toString loc + " OrExpr " + toString e1 + " " + toString e2)
+	toString (AndExpr loc e1 e2) = bracket (toString loc + " AndExpr " + toString e1 + " " + toString e2)
+	toString (NotExpr loc e) = bracket (toString loc + " NotExpr" + toString e)
+	toString (EqExpr loc e1 e2) = bracket (toString loc + " EqExpr " + toString e1 + " " + toString e2)
+	toString (LeqExpr loc e1 e2) = bracket (toString loc + " LeqExpr " + toString e1 + " " + toString e2)
+	toString (GeqExpr loc e1 e2) = bracket (toString loc + " GeqExpr " + toString e1 + " " + toString e2)
+	toString (NeqExpr loc e1 e2) = bracket (toString loc + " NeqExpr " + toString e1 + " " + toString e2)
+	toString (LesserExpr loc e1 e2) = bracket (toString loc + " LesserExpr " + toString e1 + " " + toString e2)
+	toString (GreaterExpr loc e1 e2) = bracket (toString loc + " GreaterExpr " + toString e1 + " " + toString e2)
+	toString (PlusExpr loc e1 e2) = bracket (toString loc + " PlusExpr " + toString e1 + " " + toString e2)
+	toString (MinusExpr loc e1 e2) = bracket (toString loc + " MinusExpr " + toString e1 + " " + toString e2)
+	toString (NegExpr loc e) = bracket (toString loc + " NeqExpr " + toString e)
+	toString (TimesExpr loc e1 e2) = bracket (toString loc + " TimesExpr " + toString e1 + " " + toString e2)
+	toString (DivideExpr loc e1 e2) = bracket (toString loc + " DivideExpr " + toString e1 + " " + toString e2)
+	toString (ModuloExpr loc e1 e2) = bracket (toString loc + " ModuloExpr " + toString e1 + " " + toString e2)
+	toString (NumberExpr loc n) = bracket (toString loc + " NumberExpr " + toString n)
+	toString (StringExpr loc s) = bracket (toString loc + " Stringexpr " + s)
+	toString (CharExpr loc c) = toString loc + " \'" + toString c + "\'"
+	toString (BoolExpr loc b) = bracket (toString loc + " BoolExpr " + toString b)
+	toString (Nested loc e) = bracket (toString loc + " NestedExpr " + toString e)
+	toString (TupleExpr loc els) = bracket (toString loc + " TupleExpr " + join " " (map toString els))
+	toString (EmptyList loc) = toString loc + " EmptyList"
+	toString (ListExpr loc e rest) = bracket (toString loc + " ListExpr " + toString e + " " + toString rest)
+	toString (FuncExpr loc fName []) = bracket (toString loc + " VariableExpr " + fName)
+	toString (FuncExpr loc fName args) = bracket (toString loc + " FuncExpr " + fName + " " + join " " (map toString args))
+	toString (CaseExpr loc expr rules) = bracket (toString loc + " CaseExpr " + toString expr + " " + join " " (map toString rules))
+
+instance toString WExpr
+where
+	toString (WExpr Nothing e) = toString e
+	toString (WExpr (Just t) e) = bracket ("TypedExpr " + toString e + " [" + toString t + "]")
 
 bracket s = "(" + s + ")"
+
+instance toString SourceLocation
+where
+	toString (line, col) = "[" + toString line + ":" + toString col + "]"

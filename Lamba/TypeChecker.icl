@@ -28,7 +28,7 @@ singleError loc msg = Error [TypeError loc msg]
 
 typecheck :: AST -> MaybeError [TypeError] TEnv
 typecheck (AST decls)
-# fEnv = 'DM'.fromList (map (\(FDecl loc name type _). (name, (loc, type))) decls)
+# fEnv = 'DM'.fromList (map (\(FDecl loc name (Just type) _). (name, (loc, type))) decls)
 # res = map (checkFunctionDeclaration fEnv) decls
 = case fErrors res of
 	[] = Ok ('DM'.toList (fResults res))
@@ -36,7 +36,7 @@ typecheck (AST decls)
 
 checkFunctionDeclaration :: ITEnv FDecl
 	-> MaybeError [TypeError] ITEnv
-checkFunctionDeclaration fEnv (FDecl loc name type bodies)
+checkFunctionDeclaration fEnv (FDecl loc name (Just type) bodies)
 | not (trace_tn ("Checking function declaration " + name)) = undef
 # res = map (\b. checkFunctionBody name type b fEnv) bodies
 = case fErrors res of
@@ -144,50 +144,48 @@ checkSpecificArgument loc TString match
 	= singleError loc ("Expected match of type String, got " + toString match)
 
 checkGuard :: FGuard ITEnv Type -> MaybeError [TypeError] ITEnv
-checkGuard (NonGuarded loc expr) env t = trace_n ("Checking nonguard. Required type: " + toString t) (checkExpr loc expr t env)
-checkGuard (Guarded loc guard expr) env t = trace_n "Checking guard" (comb (checkExpr loc guard TBool env) (checkExpr loc expr t env))
+checkGuard (NonGuarded loc (WExpr _ expr)) env t = trace_n ("Checking nonguard. Required type: " + toString t) (checkExpr expr t env)
+checkGuard (Guarded loc (WExpr _ guard) (WExpr _ expr)) env t = trace_n "Checking guard" (comb (checkExpr guard TBool env) (checkExpr expr t env))
 
-checkExpr :: SourceLocation Expr Type ITEnv -> MaybeError [TypeError] ITEnv
-checkExpr loc (OrExpr e1 e2) TBool env = comb (checkExpr loc e1 TBool env) (checkExpr loc e2 TBool env)
-checkExpr loc (AndExpr e1 e2) TBool env = comb (checkExpr loc e1 TBool env) (checkExpr loc e2 TBool env)
+checkExpr :: Expr Type ITEnv -> MaybeError [TypeError] ITEnv
+checkExpr (OrExpr loc e1 e2) TBool env = comb (checkExpr e1 TBool env) (checkExpr e2 TBool env)
+checkExpr (AndExpr loc e1 e2) TBool env = comb (checkExpr e1 TBool env) (checkExpr e2 TBool env)
 
-checkExpr loc (EqExpr e1 e2) TBool env
+checkExpr (EqExpr loc e1 e2) TBool env
 # results = [(r1, r2) \\ t <- [TInt, TChar, TBool, TString]
-			, r1 <- [checkExpr loc e1 t env]
-			, r2 <- [checkExpr loc e2 t env]]
+			, r1 <- [checkExpr e1 t env]
+			, r2 <- [checkExpr e2 t env]]
 = case filter (\(l, r). isOk l && isOk r) results of
 	[] = singleError loc "Expected == operands of type Int, Char, Bool, String"
 	_ = Ok 'DM'.newMap
 
-checkExpr loc (NeqExpr e1 e2) TBool env = comb (checkExpr loc e1 TBool env) (checkExpr loc e2 TBool env)
+checkExpr (NeqExpr loc e1 e2) TBool env = comb (checkExpr e1 TBool env) (checkExpr e2 TBool env)
 
-checkExpr loc (LeqExpr e1 e2) TBool env = comb (checkExpr loc e1 TInt env) (checkExpr loc e2 TInt env)
-checkExpr loc (GeqExpr e1 e2) TBool env = comb (checkExpr loc e1 TInt env) (checkExpr loc e2 TInt env)
-checkExpr loc (LesserExpr e1 e2) TBool env = comb (checkExpr loc e1 TInt env) (checkExpr loc e2 TInt env)
-checkExpr loc (GreaterExpr e1 e2) TBool env = comb (checkExpr loc e1 TInt env) (checkExpr loc e2 TInt env)
-checkExpr loc (PlusExpr e1 e2) TInt env = comb (checkExpr loc e1 TInt env) (checkExpr loc e2 TInt env)
-checkExpr loc (MinusExpr e1 e2) TInt env = comb (checkExpr loc e1 TInt env) (checkExpr loc e2 TInt env)
-checkExpr loc (NegExpr e) TBool env = checkExpr loc e TBool env
-checkExpr loc (TimesExpr e1 e2) TInt env = comb (checkExpr loc e1 TInt env) (checkExpr loc e2 TInt env)
-checkExpr loc (DivideExpr e1 e2) TInt env = comb (checkExpr loc e1 TInt env) (checkExpr loc e2 TInt env)
-checkExpr loc (ModuloExpr e1 e2) TInt env = comb (checkExpr loc e1 TInt env) (checkExpr loc e2 TInt env)
-checkExpr loc (NumberExpr n) TInt env = Ok 'DM'.newMap
-checkExpr loc (StringExpr s) TString env = Ok 'DM'.newMap
-checkExpr loc (CharExpr c) TChar env = Ok 'DM'.newMap
-checkExpr loc (BoolExpr b) TBool env = Ok 'DM'.newMap
-checkExpr loc (Nested expr) t env = checkExpr loc expr t env
-checkExpr loc (EmptyList) _ env = Ok 'DM'.newMap
-checkExpr loc (ListExpr e es) (TList t) env
+checkExpr (LeqExpr loc e1 e2) TBool env = comb (checkExpr e1 TInt env) (checkExpr e2 TInt env)
+checkExpr (GeqExpr loc e1 e2) TBool env = comb (checkExpr e1 TInt env) (checkExpr e2 TInt env)
+checkExpr (LesserExpr loc e1 e2) TBool env = comb (checkExpr e1 TInt env) (checkExpr e2 TInt env)
+checkExpr (GreaterExpr loc e1 e2) TBool env = comb (checkExpr e1 TInt env) (checkExpr e2 TInt env)
+checkExpr (PlusExpr loc e1 e2) TInt env = comb (checkExpr e1 TInt env) (checkExpr e2 TInt env)
+checkExpr (MinusExpr loc e1 e2) TInt env = comb (checkExpr e1 TInt env) (checkExpr e2 TInt env)
+checkExpr (NegExpr loc e) TBool env = checkExpr e TBool env
+checkExpr (TimesExpr loc e1 e2) TInt env = comb (checkExpr e1 TInt env) (checkExpr e2 TInt env)
+checkExpr (DivideExpr loc e1 e2) TInt env = comb (checkExpr e1 TInt env) (checkExpr e2 TInt env)
+checkExpr (ModuloExpr loc e1 e2) TInt env = comb (checkExpr e1 TInt env) (checkExpr e2 TInt env)
+checkExpr (CharExpr loc c) TChar env = Ok 'DM'.newMap
+checkExpr (BoolExpr loc b) TBool env = Ok 'DM'.newMap
+checkExpr (Nested loc expr) t env = checkExpr expr t env
+checkExpr (EmptyList loc) _ env = Ok 'DM'.newMap
+checkExpr (ListExpr loc e es) (TList t) env
 | not (trace_tn ("Checking list expression element " + toString e)) = undef
-# res = checkExpr loc e t env
-# res` = checkExpr loc es (TList t) env
+# res = checkExpr e t env
+# res` = checkExpr es (TList t) env
 = comb res res`
 
-checkExpr loc (TupleExpr [e]) (TTuple [t]) env = checkExpr loc e t env
-checkExpr loc (TupleExpr [e:es]) (TTuple [t:ts])  env
-= comb (checkExpr loc e t env) (checkExpr loc (TupleExpr es) (TTuple ts) env)
+checkExpr (TupleExpr loc [e]) (TTuple [t]) env = checkExpr e t env
+checkExpr (TupleExpr loc [e:es]) (TTuple [t:ts])  env
+= comb (checkExpr e t env) (checkExpr (TupleExpr loc es) (TTuple ts) env)
 
-checkExpr loc (FuncExpr name []) t env
+checkExpr (FuncExpr loc name []) t env
 | not (trace_tn ("Checking identifier " + name)) = undef
 # idt = 'DM'.get name env
 | isNothing idt = singleError loc ("Variable " + name + " is undefined")
@@ -195,7 +193,7 @@ checkExpr loc (FuncExpr name []) t env
 | type == t = Ok 'DM'.newMap
 = singleError loc ("Variable " + name + " has incorrect type. Expected:\n\t" + toString t + "\nGot:\n\t" + toString type)
 
-checkExpr loc (FuncExpr f es) desiredType env
+checkExpr (FuncExpr loc f es) desiredType env
 | not (trace_tn ("Checking function " + f)) = undef
 # ft = 'DM'.get f env
 | isNothing ft = singleError loc ("Function " + f + " is undefined")
@@ -206,18 +204,15 @@ checkExpr loc (FuncExpr f es) desiredType env
 	+ toString desiredType
 	+ "\nGot\n\t"
 	+ toString (returnType functionType))
-= checkFunctionApplication loc es functionType env
+= checkFunctionApplication es functionType env
 
-checkExpr loc e t _ =  singleError loc ("Expected expression of type " + toString t + ". Got: " + toString e)
+checkExpr e t _ =  singleError (0,0) ("Expected expression of type " + toString t + ". Got: " + toString e)
 
-checkFunctionApplication loc [] _ _ = Ok 'DM'.newMap
-checkFunctionApplication loc [e:es] (TFunc f to) env
-# res = checkExpr loc e f env
-# res` = checkFunctionApplication loc es to env
+checkFunctionApplication [] _ _ = Ok 'DM'.newMap
+checkFunctionApplication [e:es] (TFunc f to) env
+# res = checkExpr e f env
+# res` = checkFunctionApplication es to env
 = comb res res`
 
-checkFunctionApplication loc [e:es] t env = singleError loc ("Expected function type for expression " + toString e + ", got " + toString t)
-
-
-
+checkFunctionApplication [e:es] t env = singleError (0,0) ("Expected function type for expression " + toString e + ", got " + toString t)
 

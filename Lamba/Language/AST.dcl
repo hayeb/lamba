@@ -1,24 +1,26 @@
 definition module Lamba.Language.AST
 
-import StdEnv
+import StdMaybe
+import StdString
 
 :: SourceLocation :== (Int, Int)
 
 :: AST = AST [FDecl]
 
-:: FDecl = FDecl SourceLocation String Type [FBody]
+:: FDecl = FDecl SourceLocation String (Maybe Type) [FBody]
 
 :: FBody = FBody SourceLocation [Match] [FGuard]
 
-:: FGuard = NonGuarded SourceLocation Expr
-	| Guarded SourceLocation Expr Expr
+:: FGuard = NonGuarded SourceLocation WExpr
+	| Guarded SourceLocation WExpr WExpr
 
-:: Type = TBool
+:: Type = TVar Int
+	| TBool
 	| TInt
 	| TChar
 	| TString
 	| TVoid
-	| TTuple [Type] 
+	| TTuple [Type]
 	| TList Type
 	| TFunc Type Type
 
@@ -31,33 +33,36 @@ import StdEnv
 	| MEmptyList
 	| MList Match Match
 
-:: Expr = OrExpr Expr Expr
-	| AndExpr Expr Expr
-	| NotExpr Expr
-	| EqExpr Expr Expr
-	| LeqExpr Expr Expr
-	| GeqExpr Expr Expr
-	| NeqExpr Expr Expr
-	| LesserExpr Expr Expr
-	| GreaterExpr Expr Expr
-	| PlusExpr Expr Expr
-	| MinusExpr Expr Expr
-	| NegExpr Expr
-	| TimesExpr Expr Expr
-	| DivideExpr Expr Expr
-	| ModuloExpr Expr Expr
-	| NumberExpr Int
-	| StringExpr String
-	| CharExpr Char
-	| BoolExpr Bool
-	| Nested Expr
-	| TupleExpr [Expr]
-	| ListExpr Expr Expr
-	| EmptyList
-	| FuncExpr String [Expr]
-	| CaseExpr Expr [MatchRule]
+:: WExpr = WExpr (Maybe Type) Expr
 
-:: MatchRule = MatchRule Match Expr
+:: Expr = OrExpr SourceLocation Expr Expr
+	| AndExpr SourceLocation Expr Expr
+	| NotExpr SourceLocation Expr
+	| EqExpr SourceLocation Expr Expr
+	| LeqExpr SourceLocation Expr Expr
+	| GeqExpr SourceLocation Expr Expr
+	| NeqExpr SourceLocation Expr Expr
+	| LesserExpr SourceLocation Expr Expr
+	| GreaterExpr SourceLocation Expr Expr
+	| PlusExpr SourceLocation Expr Expr
+	| MinusExpr SourceLocation Expr Expr
+	| NegExpr SourceLocation Expr
+	| TimesExpr SourceLocation Expr Expr
+	| DivideExpr SourceLocation Expr Expr
+	| ModuloExpr SourceLocation Expr Expr
+	| NumberExpr SourceLocation Int
+	| StringExpr SourceLocation String
+	| CharExpr SourceLocation Char
+	| BoolExpr SourceLocation Bool
+	| Nested SourceLocation Expr
+	| TupleExpr SourceLocation [Expr]
+	| ListExpr SourceLocation Expr Expr
+	| EmptyList SourceLocation
+	| FuncExpr SourceLocation String [Expr]
+	| CaseExpr SourceLocation Expr [MatchRule]
 
-instance toString Type, Match, AST, FDecl, FBody, FGuard, Expr, MatchRule
-instance == Type
+:: MatchRule = MatchRule SourceLocation Match Expr
+
+instance toString Type, Match, AST, FDecl, FBody, FGuard, WExpr, Expr, MatchRule, SourceLocation
+instance == Type, SourceLocation
+instance < SourceLocation

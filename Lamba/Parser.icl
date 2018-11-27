@@ -209,105 +209,116 @@ pExpr
 = pExpr1
 where
 	pExpr1 :: Parser Expr
-	pExpr1 = pList
-		<<|> pExpr2
+	pExpr1 = loc
+		>>= \loc. (pList
+		<<|> pExpr2)
 
 	pExpr2 :: Parser Expr
-	pExpr2 = pExpr3
-		>>= \l. ((pSymbols "||" >>= \_. pExpr3 >>= \r. pure (OrExpr l r))
-			<<|> (pSymbols "&&" >>= \_.  pExpr3 >>= \r. pure (AndExpr l r)))
+	pExpr2 = loc
+		>>= \loc. pExpr3
+		>>= \l. ((pSymbols "||" >>= \_. pExpr3 >>= \r. pure (OrExpr loc l r))
+			<<|> (pSymbols "&&" >>= \_.  pExpr3 >>= \r. pure (AndExpr loc l r)))
 			<<|> return l
 
 	pExpr3 :: Parser Expr
-	pExpr3 = pExpr4
-		>>= \l. ((pSymbols "==" >>= \_. pExpr4 >>= \r. pure (EqExpr l r))
-			<<|> (pSymbols "<=" >>= \_.  pExpr4 >>= \r. pure (LeqExpr l r))
-			<<|> (pSymbols ">=" >>= \_.  pExpr4 >>= \r. pure (GeqExpr l r))
-			<<|> (pSymbols "!=" >>= \_.  pExpr4 >>= \r. pure (NeqExpr l r))
-			<<|> (pSymbol '<' >>= \_.  pExpr4 >>= \r. pure (LesserExpr l r))
-			<<|> (pSymbol '>' >>= \_.  pExpr4 >>= \r. pure (GreaterExpr l r))
+	pExpr3 = loc
+		>>= \loc. pExpr4
+		>>= \l. ((pSymbols "==" >>= \_. pExpr4 >>= \r. pure (EqExpr loc l r))
+			<<|> (pSymbols "<=" >>= \_.  pExpr4 >>= \r. pure (LeqExpr loc l r))
+			<<|> (pSymbols ">=" >>= \_.  pExpr4 >>= \r. pure (GeqExpr loc l r))
+			<<|> (pSymbols "!=" >>= \_.  pExpr4 >>= \r. pure (NeqExpr loc l r))
+			<<|> (pSymbol '<' >>= \_.  pExpr4 >>= \r. pure (LesserExpr loc l r))
+			<<|> (pSymbol '>' >>= \_.  pExpr4 >>= \r. pure (GreaterExpr loc l r))
 			<<|> return l
 			)
 
 	pExpr4 :: Parser Expr
-	pExpr4 = pExpr5
-		>>= \l. ((pSymbol '+' >>| pExpr5 >>= \r. pure (PlusExpr l r))
-			<<|> (pSymbol '-' >>| pExpr5 >>= \r. pure (MinusExpr l r))
+	pExpr4 = loc
+		>>= \loc .pExpr5
+		>>= \l. ((pSymbol '+' >>| pExpr5 >>= \r. pure (PlusExpr loc l r))
+			<<|> (pSymbol '-' >>| pExpr5 >>= \r. pure (MinusExpr loc l r))
 			<<|> return l
 			)
 
 	pExpr5 :: Parser Expr
-	pExpr5 = pExpr6
-		>>= \l. ((pSymbol '*' >>| pExpr6 >>= \r. pure (TimesExpr l r))
-			<<|> (pSymbol '/' >>| pExpr6 >>= \r. pure (DivideExpr l r))
-			<<|> (pSymbol '%' >>| pExpr6 >>= \r. pure (ModuloExpr l r))
+	pExpr5 = loc
+		>>= \loc. pExpr6
+		>>= \l. ((pSymbol '*' >>| pExpr6 >>= \r. pure (TimesExpr loc l r))
+			<<|> (pSymbol '/' >>| pExpr6 >>= \r. pure (DivideExpr loc l r))
+			<<|> (pSymbol '%' >>| pExpr6 >>= \r. pure (ModuloExpr loc l r))
 			<<|> return l)
 
 	pExpr6 :: Parser Expr
-	pExpr6 = (pNumber >>= \n. return (NumberExpr n))
-		<<|> (pString >>= \s. return (StringExpr s))
-		<<|> (pChar >>= \c. return (CharExpr c))
-		<<|> (pBool >>= \b. return (BoolExpr b))
-		<<|> (pSymbol '('
-			>>| pExpr1
-			>>= \sub. pSymbol ')'
-			>>| return (Nested sub))
-		<<|> pTuple
-		<<|> pCaseExpr
-		<<|> pAppl
+	pExpr6 = loc
+		>>= \loc. (pNumber >>= \n. return (NumberExpr loc n))
+			<<|> (pString >>= \s. return (StringExpr loc s))
+			<<|> (pChar >>= \c. return (CharExpr loc c))
+			<<|> (pBool >>= \b. return (BoolExpr loc b))
+			<<|> (pSymbol '('
+				>>| pExpr1
+				>>= \sub. pSymbol ')'
+				>>| return (Nested loc sub))
+			<<|> pTuple
+			<<|> pCaseExpr
+			<<|> pAppl
 
 	pTuple
-	= pSymbol '('
+	= loc
+		>>= \loc. pSymbol '('
 		>>| db "parsed (" pExpr1
 		>>= \e1. some (pSymbol ',' >>| pExpr1)
 		>>= \rest. pSymbol ')'
-		>>| return (TupleExpr [e1:rest])
+		>>| return (TupleExpr loc [e1:rest])
 
 	pList :: Parser Expr
-	pList =
-		(pSymbol '[' >>| pSymbol ']' >>| return (EmptyList))
+	pList = loc
+		>>= \loc. (pSymbol '[' >>| pSymbol ']' >>| return (EmptyList loc))
 		<<|> (pSymbol '['
 			>>| pExpr1
 			>>= \e. pSymbol ':'
 			>>| pList
 			>>= \es. pSymbol ']'
-			>>| return (ListExpr e es))
+			>>| return (ListExpr loc e es))
 
 	pAppl
 	| debug "Parsing function application" = undef
-	= pIdentifier
+	= loc
+		>>= \loc. pIdentifier
 		>>= \func. many pArgument
-		>>= \args. return (FuncExpr func args)
+		>>= \args. return (FuncExpr loc func args)
 	where
-		pArgument = (pNumber >>= \n. return (NumberExpr n))
-			<<|> (pString >>= \s. return (StringExpr s))
-			<<|> (pChar >>= \c. return (CharExpr c))
-			<<|> (pBool >>= \b. return (BoolExpr b))
-			<<|> pList
-			<<|> pTuple
-			<<|> (pIdentifier >>= \id. return (FuncExpr id []))
-			<<|> (pSymbol '(' >>| pExpr1 >>= \re. pSymbol ')' >>| return re)
+		pArgument = loc
+			>>= \loc. (pNumber >>= \n. return (NumberExpr loc n))
+				<<|> (pString >>= \s. return (StringExpr loc s))
+				<<|> (pChar >>= \c. return (CharExpr loc c))
+				<<|> (pBool >>= \b. return (BoolExpr loc b))
+				<<|> pList
+				<<|> pTuple
+				<<|> (pIdentifier >>= \id. return (FuncExpr loc id []))
+				<<|> (pSymbol '(' >>| pExpr1 >>= \re. pSymbol ')' >>| return (Nested loc re))
 
 	pCaseExpr :: Parser Expr
 	pCaseExpr
 	| debug "Parse CaseExpr" = undef
-	= pSpecificIdentifier "match"
+	= loc
+		>>= \loc. pSpecificIdentifier "match"
 		>>| db "got match keyword" pExpr
 		>>= \e. db ("Got expr to match: " + toString e) (strict (pSymbol ':') (\(l, t). General l ("Expected symbol ':' after case expression, got " +++ toString t)))
 		>>| incIndent
 		>>= \indent. strict (some (pCaseRule indent)) (\(l, t). General l ("Expected at least one case rule, got " +++ toString t))
 		>>= \rules. decIndent
-		>>| return (CaseExpr e rules)
+		>>| return (CaseExpr loc e rules)
 	where
 		pCaseRule :: Int -> Parser MatchRule
 		pCaseRule currentIndent
 		| debug "parsing case rule" = undef
 		= pSymbol '\n'
 			>>| db ("Parsing rule with indentation " + toString currentIndent) (pSymbols (join "" (repeatn currentIndent "\t")))
-			>>| db "Got correct indentation" pMatch
+			>>| db "Got correct indentation" loc
+			>>= \loc. pMatch
 			>>= \match. db "Parsed match rule LHS" (pSymbols "->")
 			>>| pExpr
-			>>= \expr. return (MatchRule match expr)
+			>>= \expr. return (MatchRule loc match expr)
 
 pFGuard :: Parser FGuard
 pFGuard
@@ -317,12 +328,12 @@ pFGuard
 		>>= \loc. strict pExpr (\(l, t). General l "Could not parse guard LHS")
 		>>= \ge. db  "Parsed guard left" (pSymbol '=')
 		>>| pExpr
-		>>= \re. db "Parsed guard right" (pure (Guarded loc ge re)))
+		>>= \re. db "Parsed guard right" (pure (Guarded loc (WExpr Nothing ge) (WExpr Nothing re))))
 	<|> (optionalNewline
 		>>| pSymbols "="
 		>>| loc
 		>>= \loc. pExpr
-		>>= \e. pure (NonGuarded loc e))
+		>>= \e. pure (NonGuarded loc (WExpr Nothing e)))
 
 pMatch :: Parser Match
 pMatch
@@ -365,7 +376,7 @@ pFDecl
 	>>| db "Parsing type" strict pType (\(l, t). General l ("Expected function type, got " + toString t))
 	>>= \fType. db ("Parsed type " + toString fType) (some ( pSymbol '\n' >>| pFBody fName))
 	>>= \fBody. optionalNewline
-	>>| pure (FDecl loc fName fType fBody)
+	>>| pure (FDecl loc fName (Just fType) fBody)
 
 pAst :: Parser AST
 pAst = some (optionalNewline >>| pFDecl)
