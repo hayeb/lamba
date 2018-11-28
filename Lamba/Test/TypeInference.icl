@@ -36,7 +36,28 @@ tupleExprs
    		algM (TupleExpr (0,0) [(BoolExpr (0, 1) True), (BoolExpr (0, 2) False)]) (TVar 0))
   ]
 
-Start = join "\n" (executeTests (simpleExprs ++ nestedExprs ++ tupleExprs))
+listExprs
+= [("SimpleList",
+   		(Ok [(0, TBool), (1, TBool)], {emptyState & fresh = 2}),
+   		algM (ListExpr (0,0) (NumberExpr (0,1) 1) (EmptyList (0,2))) (TList TInt))
+	, ("EmptyListInt",
+   		(Ok [(0, TList TInt)], {emptyState & fresh = 1}),
+   		algM (EmptyList (0,0)) (TList TInt))
+	, ("EmptyListBool",
+   		(Ok [(0, TList TBool)], {emptyState & fresh = 1}),
+   		algM (EmptyList (0,0)) (TList TBool))
+	, ("EmptyListChar",
+   		(Ok [(0, TList TChar)], {emptyState & fresh = 1}),
+   		algM (EmptyList (0,0)) (TList TChar))
+	, ("EmptyListString",
+   		(Ok [(0, TList TString)], {emptyState & fresh = 1}),
+   		algM (EmptyList (0,0)) (TList TString))
+  ]
+
+Start = join "\n" (executeTests (simpleExprs
+	++ nestedExprs
+	++ tupleExprs
+	++ listExprs))
 
 executeTests :: [(String, (MaybeError [InferenceError] [Substitution], IEnv), Infer [Substitution])] -> [String]
 executeTests [] = []

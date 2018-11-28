@@ -3,7 +3,7 @@ implementation module Lamba.TypeInference
 import Control.Applicative
 import Data.Error, Data.Map, Data.Tuple, Data.Functor, Data.GenEq
 import Lamba.Language.AST
-import StdInt
+import StdInt, StdMisc, StdDebug
 import Text
 
 from Control.Monad import class Monad(..)
@@ -166,15 +166,18 @@ where
 
 	algM (Nested loc e) t = algM e t
 
+	// TODO: This is not correct.
 	algM (TupleExpr loc els) t = freshN (length els)
 		>>= \elementVars. liftUnify loc t (TTuple elementVars)
 
-	algM (ListExpr loc h t) type = fresh
+	algM (ListExpr loc h t) type
+
+	= fresh
 		>>= \headVar. algM h headVar
 		>>= \subs. algM t (applySubstitutions subs (TList headVar))
-		>>= \subs`. let subs = subs ++ subs` in
-			return (applySubstitutions subs type, applySubstitutions subs headVar)
-		>>= \(reqT, hT). liftUnify loc reqT hT
+		>>= \subs`. let allsubs = subs ++ subs` in
+			return (applySubstitutions allsubs type, applySubstitutions allsubs headVar)
+		>>= \(reqT, hT). liftUnify loc reqT (TList hT)
 
 	algM (EmptyList loc) type = fresh
 		>>= \tt. liftUnify loc type tt
