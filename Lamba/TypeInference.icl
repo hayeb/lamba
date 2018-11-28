@@ -3,11 +3,13 @@ implementation module Lamba.TypeInference
 import Control.Applicative
 import Data.Error, Data.Map, Data.Tuple, Data.Functor, Data.GenEq
 import Lamba.Language.AST
-import StdInt, StdMisc, StdDebug
+import StdInt, StdMisc, StdBool
 import Text
 
-from Control.Monad import class Monad(..)
-from StdList import map, ++, instance length [], foldl
+from Control.Monad import class Monad(..), mapM
+from StdList import map, ++, instance length [], foldl, zip2, flatten
+
+import qualified Data.List as DL
 
 instance toString UnificationError
 where
@@ -34,6 +36,10 @@ where
 instance == InferenceError
 where
 	(==) e1 e2 = e1 === e2
+
+instance == Substitution
+where
+	(==) (v1, t1) (v2, t2) = v1 == v2 && t1 == t2
 
 instance Functor Infer
 where
@@ -118,7 +124,7 @@ liftUnify loc t1 t2 = Infer \state. case unify t1 t2 of
 	Ok subs = (Ok subs, state)
 
 unify :: Type Type -> MaybeError [UnificationError] [Substitution]
-unify (TVar l) (TVar r) = Ok [(l, (TVar r))]
+unify (TVar l) (TVar r) = Ok (if (l == r) [] [(l, (TVar r))])
 unify (TVar l) t = Ok [(l, t)]
 unify t (TVar r) = Ok [(r, t)]
 
@@ -146,7 +152,7 @@ where
 	algM (AST []) _ = pure []
 	algM (AST [d:ds]) t = algM d t
 		>>= \res. algM (AST ds) t
-		>>= \res`. return (res ++ res`)
+		>>= \res`. return ('DL'.union res res`)
 
 instance algM FDecl
 where
@@ -166,19 +172,21 @@ where
 
 	algM (Nested loc e) t = algM e t
 
-	// TODO: This is not correct.
-	algM (TupleExpr loc els) t = freshN (length els)
-		>>= \elementVars. liftUnify loc t (TTuple elementVars)
+	algM (TupleExpr loc els) t
+	= freshN (length els)
+		>>= \fresh. (mapM (\(tvar, e). algM e tvar) (zip2 fresh els))
+		>>= \substitutions. let subs = flatten substitutions in
+			liftUnify loc (applySubstitutions subs t) (TTuple (map (applySubstitutions subs) fresh))
+		>>= \unifySubs. return ('DL'.union subs unifySubs)
 
 	algM (ListExpr loc h t) type
-
 	= fresh
 		>>= \headVar. algM h headVar
-		>>= \subs. algM t (applySubstitutions subs (TList headVar))
-		>>= \subs`. let allsubs = subs ++ subs` in
-			return (applySubstitutions allsubs type, applySubstitutions allsubs headVar)
+		>>= \headSubs. algM t (applySubstitutions headSubs (TList headVar))
+		>>= \tailSubs. let allSubs = headSubs ++ tailSubs in
+			return (applySubstitutions allSubs type, applySubstitutions allSubs headVar)
 		>>= \(reqT, hT). liftUnify loc reqT (TList hT)
+		>>= \unifySubs. return ('DL'.union allSubs unifySubs)
 
 	algM (EmptyList loc) type = fresh
-		>>= \tt. liftUnify loc type tt
-
+		>>= \tt. liftUnify loc type (TList tt)

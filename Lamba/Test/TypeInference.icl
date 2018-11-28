@@ -4,6 +4,7 @@ import Lamba
 import Text
 from Data.Map import :: Map, newMap
 import Data.Error
+import StdMisc, StdDebug
 
 emptyState :: IEnv
 emptyState = {fresh = 0, types = newMap}
@@ -20,37 +21,51 @@ nestedExprs = [("Nested", (Ok [], emptyState), algM (Nested (0,0) (BoolExpr (0,2
 
 tupleExprs :: [(String, (MaybeError [InferenceError] [Substitution], IEnv), Infer [Substitution])]
 tupleExprs
-= [("SimpleTuple",
+= [("Tuple",
    		(Ok [(0, TBool), (1, TBool)], {emptyState & fresh = 2}),
    		algM (TupleExpr (0,0) [(BoolExpr (0, 1) True), (BoolExpr (0, 2) False)]) (TTuple [TBool, TBool]))
-   , ("WrongArityLess",
+   , ("TupleWrongArityLess",
    		(Error [InferenceError (0,3) (toString (ArityError 2 3))], {emptyState & fresh = 3}),
    		algM (TupleExpr (0,3) [(BoolExpr (0, 4) True), (BoolExpr (0, 5) False), (BoolExpr (0, 6) True)])
 			(TTuple [TBool, TBool]))
-   , ("WrongArityMore",
+   , ("TupleWrongArityMore",
    		(Error [InferenceError (0, 7) (toString (ArityError 3 2))], {emptyState & fresh = 2}),
    		algM (TupleExpr (0, 7) [(BoolExpr (0, 8) True), (BoolExpr (0, 9) False)])
 			(TTuple [TBool, TBool, TBool]))
-   , ("SimpleTupleVarType",
-   		(Ok [(0, TBool), (1, TBool)], {emptyState & fresh = 2}),
-   		algM (TupleExpr (0,0) [(BoolExpr (0, 1) True), (BoolExpr (0, 2) False)]) (TVar 0))
+   , ("TupleVarType",
+   		(Ok [(0, TBool), (1, TBool), (-1, (TTuple [TBool, TBool]))], {emptyState & fresh = 2}),
+   		algM (TupleExpr (0,0) [(BoolExpr (0, 1) True), (BoolExpr (0, 2) False)]) (TVar -1))
+   , ("TupleVarLeft",
+   		(Ok [(0, TBool), (1, TBool), (-1, TBool)], {emptyState & fresh = 2}),
+   		algM (TupleExpr (0,0) [(BoolExpr (0, 1) True), (BoolExpr (0, 2) False)]) (TTuple [TVar -1, TBool]))
+   , ("TupleVarRight",
+   		(Ok [(0, TBool), (1, TBool), (-1, TBool)], {emptyState & fresh = 2}),
+   		algM (TupleExpr (0,0) [(BoolExpr (0, 1) True), (BoolExpr (0, 2) False)]) (TTuple [TBool, TVar -1]))
+	, ("TupleErrorLeft",
+   		(Error [InferenceError (0,0) (toString (UnificationError TInt TBool))], {emptyState & fresh = 2}),
+   		algM (TupleExpr (0,0) [(BoolExpr (0, 1) True), (BoolExpr (0, 2) False)]) (TTuple [TInt, TVar -1]))
+	, ("TupleErrorBoth",
+   		(Error [InferenceError (0,0) (toString (UnificationError TInt TBool))
+			   , InferenceError (0,0) (toString (UnificationError TInt TBool))]
+			, {emptyState & fresh = 2}),
+   		algM (TupleExpr (0,0) [(BoolExpr (0, 1) True), (BoolExpr (0, 2) False)]) (TTuple [TInt, TInt]))
   ]
 
 listExprs
 = [("SimpleList",
-   		(Ok [(0, TBool), (1, TBool)], {emptyState & fresh = 2}),
+   		(Ok [(0, TInt), (1, TInt)], {emptyState & fresh = 2}),
    		algM (ListExpr (0,0) (NumberExpr (0,1) 1) (EmptyList (0,2))) (TList TInt))
 	, ("EmptyListInt",
-   		(Ok [(0, TList TInt)], {emptyState & fresh = 1}),
+   		(Ok [(0, TInt)], {emptyState & fresh = 1}),
    		algM (EmptyList (0,0)) (TList TInt))
 	, ("EmptyListBool",
-   		(Ok [(0, TList TBool)], {emptyState & fresh = 1}),
+   		(Ok [(0, TBool)], {emptyState & fresh = 1}),
    		algM (EmptyList (0,0)) (TList TBool))
 	, ("EmptyListChar",
-   		(Ok [(0, TList TChar)], {emptyState & fresh = 1}),
+   		(Ok [(0, TChar)], {emptyState & fresh = 1}),
    		algM (EmptyList (0,0)) (TList TChar))
 	, ("EmptyListString",
-   		(Ok [(0, TList TString)], {emptyState & fresh = 1}),
+   		(Ok [(0, TString)], {emptyState & fresh = 1}),
    		algM (EmptyList (0,0)) (TList TString))
   ]
 
@@ -64,7 +79,7 @@ executeTests [] = []
 executeTests [(name, expected, test) : rest]
 # result = runInfer test emptyState
 | result ==  expected = [name + " passed." : executeTests rest]
-= [name + " failed.\nGot: " + toString result + "\nExpected: " + toString expected : executeTests rest]
+= [name + " failed.\n\tGot: " + toString result + "\n\tExpected: " + toString expected : executeTests rest]
 
 instance toString (MaybeError [InferenceError] [Substitution])
 where
