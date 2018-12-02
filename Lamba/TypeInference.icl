@@ -14,7 +14,8 @@ import qualified Data.List as DL
 instance toString UnificationError
 where
 	toString (UnificationError l r) = "Could not unify \n\t" + toString l + "\nwith\n\t" + toString r
-	toString  (ArityError expected got) = "Wrong arity. Expected: " + toString expected + ". Got: " + toString got
+	toString (ArityError expected got) = "Wrong arity. Expected: " + toString expected + ". Got: " + toString got
+	toString (FunctionApplicationError name derived demanded) = "Function \"" + name + "\" has derived type\n\t" + toString derived + "\nwhile demanded\n\t" + toString demanded
 
 instance toString InferenceError
 where
@@ -203,16 +204,34 @@ where
 	= retrieve loc name
 		>>= \functionType. liftUnify loc type functionType
 
-	/*algM (FuncExpr loc name arguments) type
+	algM (FuncExpr loc name arguments) type
 	= retrieve loc name // Gives error if function undefined
 		>>= \functionType. freshN (length arguments)
-		>>= \fresh. mapM (\(tvar, e). algM e tvar) (zip fresh arguments)
-		>>= \substitutions. let subs = flatten substitutions in
-			liftUnify loc (applySubstitutiona subs type) (TFunc
+		>>= \vars. mapM (\(tvar, e). algM e tvar) (zip2 vars arguments)
+		>>= \sub1. fresh
+		>>= \retVar. liftUnify loc retVar type
+		>>= \sub2. (let subs = flatten sub1 ++ sub2 in
+				   let fType = toFunctionType (map (applySubstitutions subs) vars ++ [applySubstitutions subs retVar]) in
+				   liftUnifyFunc name loc fType functionType)
 	where
-		fTypeToList (TFunc f t) = [f : fTypeToList t]
-		fTypeToList t = [t]
+		toFunctionType :: [Type] -> Type
+		toFunctionType [f, t] = TFunc f t
+		toFunctionType [e:es] = TFunc e (toFunctionType es)
 
-		fTypeFromList [f,t] = TFunc f t
-		fTypeFromList [f:rest] = TFunc f (fTypeFromList rest)
-		*/
+		returnType :: Type -> Type
+		returnType (TFunc f t) = returnType t
+		returnType t = t
+
+		liftUnifyFunc :: String SourceLocation Type Type -> Infer [Substitution]
+		liftUnifyFunc name loc derived required = Infer \state. case unify derived required of
+			Error _ = (Error [InferenceError loc (toString (FunctionApplicationError name derived required))], state)
+			Ok subs = (Ok subs, state)
+
+	/* algM function:
+	 * 1. Retrieve function type, error if undefiend
+	 * 2. Generate fresh variables for each argument expression
+	 * 3. Run algM on each of the arguments.
+	 * 4. Apply the substitutions to the function type and the demanded type
+	 * 5. Transform the substitutions into a function type
+	 * 6. Unify the function type with the demanded type
+	 */

@@ -27,7 +27,7 @@ Global
 			GenericFusion:	False
 			DescExL:	False
 		Output
-			Output: NoReturnType
+			Output: BasicValuesOnly
 			Font:	Monaco
 			FontSize:	9
 			WriteStdErr:	False
@@ -42,6 +42,7 @@ Global
 		ExportedNames:	
 	Paths
 		Path:	{Project}
+		Path:	{Project}/../..
 	Precompile:	
 	Postlink:	
 MainModule

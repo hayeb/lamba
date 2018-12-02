@@ -21,6 +21,7 @@ from Data.Map import :: Map
 
 :: UnificationError = UnificationError Type Type // Could not unify t1 with t2
 	| ArityError Int Int // Tuple of function with wrong arity
+	| FunctionApplicationError String Type Type // Name, derived type, demanded type
 
 :: InferenceError = InferenceError SourceLocation String
 	| UndefinedVariableError String SourceLocation

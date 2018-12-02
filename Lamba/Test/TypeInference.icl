@@ -105,7 +105,26 @@ funcExprs
 	("VariableUndefined",
 		emptyState,
 		(Error [UndefinedVariableError "test" (0,0)], emptyState),
-		algM (FuncExpr (0,0) "test" []) (TVar -1))
+		algM (FuncExpr (0,0) "test" []) (TVar -1)),
+	("FunctionArity1",
+		{emptyState & types = fromList [("test", ((0,0), TFunc TBool TBool))]},
+		(Ok [], {emptyState & fresh = 2, types = fromList [("test", ((0,0), TFunc TBool TBool))]}),
+		algM (FuncExpr (0,0) "test" [BoolExpr (0,1) True]) TBool),
+	("FunctionArity1WrongArgument",
+		{emptyState & types = fromList [("test", ((0,0), TFunc TBool TBool))]},
+		(Error [InferenceError (0,0) (toString (FunctionApplicationError "test" (TFunc TInt TBool) (TFunc TBool TBool)))],
+			{emptyState & fresh = 2, types = fromList [("test", ((0,0), TFunc TBool TBool))]}),
+		algM (FuncExpr (0,0) "test" [NumberExpr (0,1) 1]) TBool),
+	("FunctionTooManyArguments",
+		{emptyState & types = fromList [("test", ((0,0), TFunc TBool TBool))]},
+		(Error [InferenceError (0,0) (toString (FunctionApplicationError "test" (TFunc TInt (TFunc TInt TBool)) (TFunc TBool TBool)))],
+			{emptyState & fresh = 3, types = fromList [("test", ((0,0), TFunc TBool TBool))]}),
+		algM (FuncExpr (0,0) "test" [NumberExpr (0,1) 1, NumberExpr (0,2) 2]) TBool),
+	("FunctionTooFewArguments",
+		{emptyState & types = fromList [("test", ((0,0), TFunc TBool (TFunc TBool TBool)))]},
+		(Error [InferenceError (0,0) (toString (FunctionApplicationError "test" (TFunc TBool TBool) (TFunc TBool (TFunc TBool TBool))))],
+			{emptyState & fresh = 2, types = fromList [("test", ((0,0), TFunc TBool (TFunc TBool TBool)))]}),
+		algM (FuncExpr (0,0) "test" [BoolExpr (0,1) True]) TBool)
   ]
 
 Start = join "\n" (executeTests (simpleExprs
