@@ -6,7 +6,7 @@ import Lamba.Language.AST
 from Data.Map import :: Map
 
 // We keep a list of type environments. For every scope, we append a new map to the front of the list
-:: TypeScope :== Map SourceLocation (String, Type)
+:: TypeScope :== Map String (SourceLocation, Type)
 
 // Type inference environment
 :: IEnv = { fresh :: Int
@@ -23,6 +23,7 @@ from Data.Map import :: Map
 	| ArityError Int Int // Tuple of function with wrong arity
 
 :: InferenceError = InferenceError SourceLocation String
+	| UndefinedVariableError String SourceLocation
 
 infer :: AST -> MaybeError [InferenceError] TypeScope
 runInfer :: (Infer a) IEnv -> (MaybeError [InferenceError] a, IEnv)

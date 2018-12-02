@@ -3,7 +3,7 @@ implementation module Lamba.TypeInference
 import Control.Applicative
 import Data.Error, Data.Map, Data.Tuple, Data.Functor, Data.GenEq
 import Lamba.Language.AST
-import StdInt, StdMisc, StdBool
+import StdInt, StdMisc, StdBool, StdTuple, StdDebug
 import Text
 
 from Control.Monad import class Monad(..), mapM
@@ -21,12 +21,14 @@ where
 	toString (InferenceError (line, col) str)
 	= "[" + toString line + ":" + toString col + "] Type error: " + str
 
+	toString (UndefinedVariableError var loc) = toString loc + "Undefined variable: " + var
+
 instance toString IEnv
 where
 	toString {fresh, types} = "IEnv "
 		+ toString fresh + (case null types of
 				True = " []"
-				False = join "\n" (map (\(loc, (name, type)). toString loc + " " + name + " :: " + toString type) (toList types)))
+				False = join "\n" (map (\(name, (loc, type)). toString loc + " " + name + " :: " + toString type) (toList types)))
 
 derive gEq IEnv, InferenceError, Type
 instance == IEnv
@@ -76,7 +78,7 @@ runInfer (Infer f) state = f state
 freshFunction :: String SourceLocation -> Infer Type
 freshFunction fname loc = Infer \state=:{fresh, types}.
 	(Ok (TVar fresh), {state & fresh = inc fresh
-								 , types = put loc (fname, TVar fresh) types})
+								 , types = put fname (loc, TVar fresh) types})
 
 fresh :: Infer Type
 fresh = Infer \state=:{fresh}. (Ok (TVar fresh), {state & fresh = inc fresh})
@@ -85,6 +87,12 @@ freshN n = Infer \state=:{fresh}. (Ok [TVar n \\ n <- [fresh..fresh + n - 1]], {
 
 applyEnv :: [Substitution] -> Infer ()
 applyEnv subs = Infer \state=:{types}. (Ok (), applySubstitutionsEnv subs state)
+
+retrieve :: SourceLocation String -> Infer Type
+retrieve loc name = Infer \state=:{types}.
+	case get name types of
+	Nothing = (Error [UndefinedVariableError name loc], state)
+	Just type = (Ok (snd type), state)
 
 infer :: AST -> MaybeError [InferenceError] TypeScope
 infer ast
@@ -113,6 +121,7 @@ where
 	applySubstitution (sname, stype) (TVar name)
 	| sname == name = stype
 	= TVar name
+
 	applySubstitution sub (TTuple types) = TTuple (map (applySubstitution sub) types)
 	applySubstitution sub (TList type) = TList (applySubstitution sub type)
 	applySubstitution sub (TFunc fromt tot) = TFunc (applySubstitution sub fromt) (applySubstitution sub tot)
@@ -169,12 +178,11 @@ where
 	algM (StringExpr loc _) t = liftUnify loc t TString
 	algM (CharExpr loc _)   t = liftUnify loc t TChar
 	algM (BoolExpr loc _)   t = liftUnify loc t TBool
-
-	algM (Nested loc e) t = algM e t
+	algM (Nested loc e) t 	  = algM e t
 
 	algM (TupleExpr loc els) t
 	= freshN (length els)
-		>>= \fresh. (mapM (\(tvar, e). algM e tvar) (zip2 fresh els))
+		>>= \fresh. mapM (\(tvar, e). algM e tvar) (zip2 fresh els)
 		>>= \substitutions. let subs = flatten substitutions in
 			liftUnify loc (applySubstitutions subs t) (TTuple (map (applySubstitutions subs) fresh))
 		>>= \unifySubs. return ('DL'.union subs unifySubs)
@@ -183,10 +191,28 @@ where
 	= fresh
 		>>= \headVar. algM h headVar
 		>>= \headSubs. algM t (applySubstitutions headSubs (TList headVar))
-		>>= \tailSubs. let allSubs = headSubs ++ tailSubs in
+		>>= \tailSubs. let allSubs = 'DL'.union headSubs tailSubs in
 			return (applySubstitutions allSubs type, applySubstitutions allSubs headVar)
 		>>= \(reqT, hT). liftUnify loc reqT (TList hT)
 		>>= \unifySubs. return ('DL'.union allSubs unifySubs)
 
 	algM (EmptyList loc) type = fresh
 		>>= \tt. liftUnify loc type (TList tt)
+
+	algM (FuncExpr loc name []) type
+	= retrieve loc name
+		>>= \functionType. liftUnify loc type functionType
+
+	/*algM (FuncExpr loc name arguments) type
+	= retrieve loc name // Gives error if function undefined
+		>>= \functionType. freshN (length arguments)
+		>>= \fresh. mapM (\(tvar, e). algM e tvar) (zip fresh arguments)
+		>>= \substitutions. let subs = flatten substitutions in
+			liftUnify loc (applySubstitutiona subs type) (TFunc
+	where
+		fTypeToList (TFunc f t) = [f : fTypeToList t]
+		fTypeToList t = [t]
+
+		fTypeFromList [f,t] = TFunc f t
+		fTypeFromList [f:rest] = TFunc f (fTypeFromList rest)
+		*/
