@@ -9,7 +9,7 @@ import StdString
 
 :: FDecl = FDecl SourceLocation String (Maybe Type) [FBody]
 
-:: FBody = FBody SourceLocation [Match] [FGuard]
+:: FBody = FBody SourceLocation String [Match] [FGuard]
 
 :: FGuard = NonGuarded SourceLocation WExpr
 	| Guarded SourceLocation WExpr WExpr

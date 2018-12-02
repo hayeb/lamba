@@ -69,8 +69,8 @@ openFile = CIO \cs. case readFile cs.fileName cs.world of
 formatTokens :: [(TokenLocation, Token)] -> String
 formatTokens tokens = join "\n" (map toString tokens)
 
-formatTypes :: (Map SourceLocation (String, Type)) -> String
-formatTypes types = join "\n" (map (\((line, col), (name, type)). "["
+formatTypesEnv :: (Map SourceLocation (String, Type)) -> String
+formatTypesEnv types = join "\n" (map (\((line, col), (name, type)). "["
 	+ toString line
 	+ ":"
 	+ toString col
@@ -110,7 +110,7 @@ where
 		>>= \ast. print ("Parsing succeeded. AST: \n" + toString ast)
 		>>| case infer ast of
 			Error e = compileError (join "\n" (map toString e))
-			Ok types = print ("Types: " + formatTypes types)
+			Ok types = print ("Type inferencing succeeded")
 		>>| return ()
 
 	closeConsole console world

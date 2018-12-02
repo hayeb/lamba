@@ -365,7 +365,7 @@ pFBody fname
 	>>= \loc. strict (pSpecificIdentifier fname) (\(l, t). General l ("Expected function body with name " + fname))
 	>>| db "Correct function name" (many pMatch)
 	>>= \arguments. db ("Parsed arguments [" + join " " (map toString arguments) + "]") (some pFGuard)
-	>>= \guards. pure (FBody loc arguments guards)
+	>>= \guards. pure (FBody loc fname arguments guards)
 
 pFDecl :: Parser FDecl
 pFDecl

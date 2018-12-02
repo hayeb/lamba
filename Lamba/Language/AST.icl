@@ -60,8 +60,8 @@ where
 
 instance toString FBody
 where
-	toString (FBody _ [] guards) = concat (map toString guards)
-	toString (FBody _ matches guards)
+	toString (FBody _ _ [] guards) = concat (map toString guards)
+	toString (FBody _ _ matches guards)
 	= " " + join " " (map toString matches) + concat (map toString guards)
 
 instance toString FGuard

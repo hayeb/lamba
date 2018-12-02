@@ -82,6 +82,10 @@ freshFunction fname loc = Infer \state=:{fresh, types}.
 	(Ok (TVar fresh), {state & fresh = inc fresh
 								 , types = put fname (loc, TVar fresh) types})
 
+storeFunctionType :: String SourceLocation Type -> Infer Type
+storeFunctionType fname loc type = Infer \state=:{types}.
+	(Ok type, {state & types = put fname (loc, type) types})
+
 fresh :: Infer Type
 fresh = Infer \state=:{fresh}. (Ok (TVar fresh), {state & fresh = inc fresh})
 
@@ -162,17 +166,30 @@ instance algM AST
 where
 	algM (AST []) _ = pure []
 	algM (AST [d:ds]) t = algM d t
-		>>= \res. algM (AST ds) t
+		>>= \res. applyEnv res
+		>>| algM (AST ds) t
 		>>= \res`. return ('DL'.union res res`)
 
 instance algM FDecl
 where
 	algM (FDecl loc name Nothing bodies) _
 	// Record that we have encountered a function without type in the environment
-	= return []
+	= freshFunction name loc
+		>>| mapM (\b. algM b TVoid) bodies
+		>>= \subs. return (flatten subs)
 
 	algM (FDecl loc name (Just type) bodies) _
-	= return []
+	= storeFunctionType name loc type
+		>>| mapM (\b. algM b TVoid) bodies
+		>>= \subs. return (flatten subs)
+
+instance algM FBody
+where
+	algM (FBody loc name matches guards) _
+	=	retrieve name
+		>>= \ftype. freshN (length matches)
+		>>= \matchVariables. mapM (\(var, match). algM match var) (zip2 matchVariables matches)
+		>>= \subs1.
 
 instance algM Expr
 where

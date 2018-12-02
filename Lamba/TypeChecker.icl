@@ -38,14 +38,14 @@ checkFunctionDeclaration :: ITEnv FDecl
 	-> MaybeError [TypeError] ITEnv
 checkFunctionDeclaration fEnv (FDecl loc name (Just type) bodies)
 | not (trace_tn ("Checking function declaration " + name)) = undef
-# res = map (\b. checkFunctionBody name type b fEnv) bodies
+# res = map (\b. checkFunctionBody type b fEnv) bodies
 = case fErrors res of
 	[] = Ok (fResults res)
 	es = Error es
 
-checkFunctionBody :: String Type FBody ITEnv
+checkFunctionBody :: Type FBody ITEnv
 	-> MaybeError [TypeError] ITEnv
-checkFunctionBody name ft=:(TFunc _ _) (FBody loc args guards) env
+checkFunctionBody ft=:(TFunc _ _) (FBody loc name args guards) env
 | not (trace_tn "Checking function body") = undef
 | not (correctArity ft args)
 	= singleError loc ("Function body "
@@ -65,14 +65,14 @@ checkFunctionBody name ft=:(TFunc _ _) (FBody loc args guards) env
 		es = Error es
 
 // A simple function which takes no arguments, but arguments were specified.
-checkFunctionBody name _ (FBody loc args=:[a:as] guards) env
+checkFunctionBody _ (FBody loc name args=:[a:as] guards) env
 	= singleError loc ("Function "
 		+ name
 		+ " does not take arguments, but found "
 		+ toString (length args)
 		+ " arguments")
 
-checkFunctionBody name simpleType (FBody loc _ guards) env
+checkFunctionBody simpleType (FBody loc name _ guards) env
 | not (trace_tn ("Checking function body " + name + " with simple type " + toString simpleType)) = undef
 # res = map (\g. checkGuard g env simpleType) guards
 = case fErrors res of
