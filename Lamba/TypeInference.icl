@@ -71,6 +71,9 @@ where
 runInfer :: (Infer a) IEnv -> (MaybeError [InferenceError] a, IEnv)
 runInfer (Infer f) state = f state
 
+error :: String SourceLocation -> Infer a
+error err location = Infer \state. (Error [InferenceError location err], state)
+
 (-&-) infixl 3 :: (MaybeError [e] [a]) (MaybeError [e] [a]) -> MaybeError [e] [a]
 (-&-) (Ok la) (Ok ra) = Ok (la ++ ra)
 (-&-) (Error le) (Ok ra) = Error le
@@ -185,11 +188,33 @@ where
 
 instance algM FBody
 where
+	/* algM function body
+	 * 1. Check arity of the matches
+	 */
 	algM (FBody loc name matches guards) _
-	=	retrieve name
-		>>= \ftype. freshN (length matches)
+	= retrieve loc name
+		>>= \ftype. checkArity ftype matches
+		>>| freshN (length matches)
 		>>= \matchVariables. mapM (\(var, match). algM match var) (zip2 matchVariables matches)
-		>>= \subs1.
+		>>= \subs1. return []
+	where
+		// If we encounter a function body for which we do not know the exact type, we cannot know whether the arity is
+		// correct yet. Assume it is for now, errors will come when considering different alternatives of the same function
+		// or different applications of the function.
+		checkArity (TVar _) _ = return ()
+		checkArity ftype matches
+		# functionArity = arity ftype
+		| arity ftype <> length matches = error ("Function body has "
+			+ toString (length matches)
+			+ " arguments, while type requires "
+			+ toString (arity ftype)
+			+ " arguments.") loc
+		= return ()
+
+instance algM Match
+where
+	algM _ t = return []
+
 
 instance algM Expr
 where
@@ -222,6 +247,14 @@ where
 	= retrieve loc name
 		>>= \functionType. liftUnify loc type functionType
 
+	/* algM function:
+	 * 1. Retrieve function type, error if undefiend
+	 * 2. Generate fresh variables for each argument expression
+	 * 3. Run algM on each of the arguments.
+	 * 4. Apply the substitutions to the function type and the demanded type
+	 * 5. Transform the substitutions into a function type
+	 * 6. Unify the function type with the demanded type
+	 */
 	algM (FuncExpr loc name arguments) type
 	= retrieve loc name // Gives error if function undefined
 		>>= \functionType. freshN (length arguments)
@@ -245,11 +278,3 @@ where
 			Error _ = (Error [InferenceError loc (toString (FunctionApplicationError name derived required))], state)
 			Ok subs = (Ok subs, state)
 
-	/* algM function:
-	 * 1. Retrieve function type, error if undefiend
-	 * 2. Generate fresh variables for each argument expression
-	 * 3. Run algM on each of the arguments.
-	 * 4. Apply the substitutions to the function type and the demanded type
-	 * 5. Transform the substitutions into a function type
-	 * 6. Unify the function type with the demanded type
-	 */

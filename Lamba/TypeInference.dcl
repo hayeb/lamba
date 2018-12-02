@@ -37,3 +37,5 @@ where
 	algM :: a Type -> Infer [Substitution]
 
 instance algM Expr
+
+instance algM FBody

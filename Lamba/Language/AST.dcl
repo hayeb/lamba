@@ -66,3 +66,5 @@ import StdString
 instance toString Type, Match, AST, FDecl, FBody, FGuard, WExpr, Expr, MatchRule, SourceLocation
 instance == Type, SourceLocation
 instance < SourceLocation
+
+arity :: Type -> Int

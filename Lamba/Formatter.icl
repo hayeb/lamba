@@ -11,10 +11,10 @@ formatDecl (FDecl loc name (Just type) bodies) = name
 	+ " :: "
 	+ formatType type
 	+ "\n"
-	+ (join "\n" (map (formatBody name) bodies))
+	+ join "\n" (map formatBody bodies)
 
-formatBody :: String FBody -> String
-formatBody name (FBody loc matches guards) = name
+formatBody :: FBody -> String
+formatBody (FBody loc name matches guards) = name
 	+ " "
 	+ (join " " (map formatMatch matches))
 	+ (join "" (map formatGuard guards))

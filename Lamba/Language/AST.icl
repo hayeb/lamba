@@ -111,3 +111,7 @@ bracket s = "(" + s + ")"
 instance toString SourceLocation
 where
 	toString (line, col) = "[" + toString line + ":" + toString col + "]"
+
+arity :: Type -> Int
+arity (TFunc f t) = inc (arity t)
+arity _ = 0
