@@ -3,6 +3,7 @@ implementation module Lamba.TypeInference
 import Control.Applicative
 import Data.Error, Data.Map, Data.Tuple, Data.Functor, Data.GenEq
 import Lamba.Language.AST
+import Lamba.Formatter
 import StdInt, StdMisc, StdBool, StdTuple, StdDebug
 import Text
 
@@ -15,7 +16,7 @@ instance toString UnificationError
 where
 	toString (UnificationError l r) = "Could not unify \n\t" + toString l + "\nwith\n\t" + toString r
 	toString (ArityError expected got) = "Wrong arity. Expected: " + toString expected + ". Got: " + toString got
-	toString (FunctionApplicationError name derived demanded) = "Function \"" + name + "\" has derived type\n\t" + toString derived + "\nwhile demanded\n\t" + toString demanded
+	toString (FunctionApplicationError name derived demanded) = "Function \"" + name + "\" has derived type\n\t" + formatType derived + "\nwhile demanded\n\t" + formatType demanded
 
 instance toString InferenceError
 where
