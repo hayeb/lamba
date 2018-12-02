@@ -131,16 +131,16 @@ funcBodies
 = [("FunctionBodyDefinedCorrectArity", // there was a type
 		{emptyState & types = fromList [("test", ((0,0), TFunc TBool TBool))]},
 		(Ok [],	{emptyState & fresh = 1, types = fromList [("test", ((0,0), TFunc TBool TBool))]}),
-		algM (FBody (0,0) "test" [MBool True] []) TVoid),
+		algM (FBody (0,0) "test" [MBool (1,0) True] []) TVoid),
 	("FunctionBodyUndefined", // there was no type given by the programmer
 		{emptyState & types = fromList [("test", ((0,0), TVar -1))]},
 		(Ok [],	{emptyState & fresh = 1, types = fromList [("test", ((0,0), TVar -1))]}),
-		algM (FBody (0,0) "test" [MBool True] []) TVoid),
+		algM (FBody (0,0) "test" [MBool (1,0) True] []) TVoid),
 	("FunctionBodyDefinedTooManyMatches", // there was a type, but there are too many variables in the match
 		{emptyState & types = fromList [("test", ((0,0), TFunc TBool TBool))]},
 		(Error [InferenceError (0,0) "Function body has 2 arguments, while type requires 1 arguments."],
 			{emptyState & fresh = 0, types = fromList [("test", ((0,0), TFunc TBool TBool))]}),
-		algM (FBody (0,0) "test" [MBool True, MBool False] []) TVoid),
+		algM (FBody (0,0) "test" [MBool (1, 0) True, MBool (1,0) False] []) TVoid),
 	("FunctionBodyDefinedTooFewMatches", // there was a type, but there are too few variables in the match
 		{emptyState & types = fromList [("test", ((0,0), TFunc TBool TBool))]},
 		(Error [InferenceError (0,0) "Function body has 0 arguments, while type requires 1 arguments."],

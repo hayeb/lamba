@@ -338,25 +338,26 @@ pFGuard
 pMatch :: Parser Match
 pMatch
 | debug "Parsing function match" = undef
-= (pIdentifier >>= \id. return (MVar id))
-	<<|> (pString >>= \str. return (MString str))
-	<<|> (pChar >>= \char. return (MChar char))
-	<<|> (pBool >>= \bool. return (MBool bool))
-	<<|> (pNumber >>= \num. return (MInt num))
-	<<|> (pSymbol '(' >>| tupleEls >>= \els. pSymbol ')' >>| return (MTuple els))
-	<<|> pMatchList
+= loc
+	>>= \loc. (pIdentifier >>= \id. return (MVar loc id))
+	<<|> (pString >>= \str. return (MString loc str))
+	<<|> (pChar >>= \char. return (MChar loc char))
+	<<|> (pBool >>= \bool. return (MBool loc bool))
+	<<|> (pNumber >>= \num. return (MInt loc num))
+	<<|> (pSymbol '(' >>| tupleEls >>= \els. pSymbol ')' >>| return (MTuple loc els))
+	<<|> pMatchList loc
 where
 	tupleEls = pMatch
 		>>= \e. some (pSymbol ',' >>| pMatch)
 		>>= \es. return [e : es]
 
-	pMatchList = (pSymbols "[]" >>| return MEmptyList)
+	pMatchList loc = (pSymbols "[]" >>| return (MEmptyList loc))
 		<<|> (pSymbol '['
 			>>| pMatch
 			>>= \m. pSymbol ':'
 			>>| pMatch
 			>>= \es. pSymbol ']'
-			>>| return (MList m es))
+			>>| return (MList loc m es))
 
 pFBody :: String -> Parser FBody
 pFBody fname

@@ -34,14 +34,14 @@ formatType (TTuple els) = "(" + join ", " (map formatType els) + ")"
 formatType (TList t) = "[" + formatType t + "]"
 
 formatMatch :: Match -> String
-formatMatch (MVar s) = s
-formatMatch (MInt i) = toString i
-formatMatch (MString s) = "\"" + s + "\""
-formatMatch (MChar c) = "\'" + toString c + "\'"
-formatMatch (MBool b) = toString b
-formatMatch (MTuple els) = "(" + join ", " (map formatMatch els) + ")"
-formatMatch MEmptyList = "[]"
-formatMatch (MList e es) = "[" + formatMatch e + ":" + formatMatch es + "]"
+formatMatch (MVar loc s) = s
+formatMatch (MInt loc i) = toString i
+formatMatch (MString loc s) = "\"" + s + "\""
+formatMatch (MChar loc c) = "\'" + toString c + "\'"
+formatMatch (MBool loc b) = toString b
+formatMatch (MTuple loc els) = "(" + join ", " (map formatMatch els) + ")"
+formatMatch (MEmptyList loc) = "[]"
+formatMatch (MList loc e es) = "[" + formatMatch e + ":" + formatMatch es + "]"
 
 formatWExpr :: WExpr -> String
 formatWExpr (WExpr _ e) = formatExpr e

@@ -213,8 +213,7 @@ where
 
 instance algM Match
 where
-	algM _ t = return []
-
+	algM _ _ = return []
 
 instance algM Expr
 where

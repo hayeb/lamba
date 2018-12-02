@@ -24,14 +24,14 @@ import StdString
 	| TList Type
 	| TFunc Type Type
 
-:: Match = MVar String
-	| MInt Int
-	| MString String
-	| MChar Char
-	| MBool Bool
-	| MTuple [Match]
-	| MEmptyList
-	| MList Match Match
+:: Match = MVar SourceLocation String
+	| MInt SourceLocation Int
+	| MString SourceLocation String
+	| MChar SourceLocation Char
+	| MBool SourceLocation Bool
+	| MTuple SourceLocation [Match]
+	| MEmptyList SourceLocation
+	| MList SourceLocation Match Match
 
 :: WExpr = WExpr (Maybe Type) Expr
 

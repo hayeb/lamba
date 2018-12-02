@@ -30,14 +30,14 @@ where
 
 instance toString Match
 where
-	toString (MVar s) = bracket ("MVar " + s)
-	toString (MInt i) = bracket ("MInt " + toString i)
-	toString (MString s) = bracket ("MString " + s)
-	toString (MChar c) = bracket ("MChar " + toString c)
-	toString (MBool b) = bracket ("MBool " + toString b)
-	toString (MTuple els) = bracket ("MTuple " + join " " (map toString els))
-	toString MEmptyList = "MEmptyList"
-	toString (MList e es) = bracket ("MList " + toString e + " " + toString es)
+	toString (MVar loc s) = bracket ("MVar " + s)
+	toString (MInt loc i) = bracket ("MInt " + toString i)
+	toString (MString loc s) = bracket ("MString " + s)
+	toString (MChar loc c) = bracket ("MChar " + toString c)
+	toString (MBool loc b) = bracket ("MBool " + toString b)
+	toString (MTuple loc els) = bracket ("MTuple " + join " " (map toString els))
+	toString (MEmptyList loc) = "MEmptyList"
+	toString (MList loc e es) = bracket ("MList " + toString e + " " + toString es)
 
 instance toString MatchRule
 where
