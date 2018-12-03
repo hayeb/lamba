@@ -12,10 +12,10 @@ fst :: (Bool, Bool) -> Bool
 fst (l, r) = l
 
 snd :: (Bool, Bool) -> Bool
-snd (l, r) = r
+snd (l, r) = l
 
 seq :: String -> String -> Bool
-seq l r = (l == r && l == r) && fib 18 == fib 14
+seq l r = fst (True, False)
 
 not :: Bool -> Bool
 not True = False
@@ -34,14 +34,14 @@ strTest :: (String, (Int, String)) -> String
 strTest (l, (n, r)) = l
 
 // This is a test
-hd :: [Int] -> Int
+hd :: [String] -> Int
 hd [] = 0
-hd [h:rest] = h
+hd [bla:rest] = 0
 
 otherHd :: [Int] -> Int
 otherHd l = match l:
-	[] -> o
-	[h:rest] -> h
+	[] -> 0
+	[string:rest] -> bla
 
 tl :: [Int] -> [Int]
 tl [] = []
@@ -57,4 +57,4 @@ pow _ 0 = 1
 pow n p = p * (pow n (p - 1))
 
 Main :: (Int, String, String, Int)
-Main = (fib 15, choose True, strTest ("bla", (15, "bleh")), hd [1 : [2:[]]])
+Main = (fib 15, choose True, strTest ("bla", (15, "bleh")), hd [])

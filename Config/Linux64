@@ -1,15 +1,15 @@
 Environment
-		EnvironmentName:	Lamba
-		EnvironmentPaths
-			Path:	{Application}/lib/StdEnv
-			Path:	{Application}/lib/ArgEnv
-			Path:	{Application}/lib/Platform
-		EnvironmentCompiler:	lib/exe/cocl
-		EnvironmentCodeGen:	lib/exe/cg
-		EnvironmentLinker:	lib/exe/linker
-		EnvironmentDynLink:	lib/exe/linker
-		EnvironmentVersion:	920
-		EnvironmentRedirect:	False
-		EnvironmentCompileMethod:	Pers
-		EnvironmentProcessor:	I386
-		Environment64BitProcessor:	True
+	EnvironmentName:	Lamba
+	EnvironmentPaths
+		Path:	{Application}/lib/StdEnv
+		Path:	{Application}/lib/ArgEnv
+		Path:	{Application}/lib/Platform
+	EnvironmentCompiler:	lib/exe/cocl
+	EnvironmentCodeGen:	lib/exe/cg
+	EnvironmentLinker:	lib/exe/linker
+	EnvironmentDynLink:	lib/exe/linker
+	EnvironmentVersion:	920
+	EnvironmentRedirect:	False
+	EnvironmentCompileMethod:	Pers
+	EnvironmentProcessor:	I386
+	Environment64BitProcessor:	True

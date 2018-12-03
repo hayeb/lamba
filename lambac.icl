@@ -103,12 +103,11 @@ where
 	compile = openFile
 		>>= \contents. case tokenize contents of
 			Error e = compileError (toString e)
-			Ok tokens = compileInfo ("Tokens: " + formatTokens tokens) tokens
+			Ok tokens = return tokens
 		>>= \tokens. case parse tokens of
 			Error e = compileError (toString e)
 			Ok ast = pure ast
-		>>= \ast. print ("Parsing succeeded. AST: \n" + toString ast)
-		>>| case infer ast of
+		>>= \ast. case infer ast of
 			Error e = compileError (join "\n" (map toString e))
 			Ok types = print ("Type inferencing succeeded")
 		>>| return ()

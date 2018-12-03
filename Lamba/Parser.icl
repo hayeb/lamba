@@ -9,7 +9,7 @@ import Lamba.Language.AST
 
 import StdMisc, StdDebug, Text
 
-parseDebug = True
+parseDebug = False
 
 debug m
 | parseDebug = trace_n m False
@@ -106,8 +106,8 @@ decIndent = Parser \st=:{indent}. [(Parsed (dec indent), {st & indent = dec (ind
 
 (<|>) infixl 0 :: (Parser a) (Parser a) -> Parser a
 (<|>) (Parser l) (Parser r) = Parser \inp. case l inp of
-	[] = trace_n "No results from LHS" r inp
-	ls = trace_n ("Results from LHS" + join " " (map (toString o fst) ls)) ls
+	[] = r inp
+	ls = ls
 
 err :: ParseError -> Parser a
 err err = Parser \inp. [(Failed err, inp)]
@@ -377,7 +377,7 @@ pFDecl
 	>>| db "Parsing type" strict pType (\(l, t). General l ("Expected function type, got " + toString t))
 	>>= \fType. db ("Parsed type " + toString fType) (some ( pSymbol '\n' >>| pFBody fName))
 	>>= \fBody. optionalNewline
-	>>| pure (FDecl loc fName (Just fType) fBody)
+	>>| pure (FDecl loc fName fType fBody)
 
 pAst :: Parser AST
 pAst = some (optionalNewline >>| pFDecl)

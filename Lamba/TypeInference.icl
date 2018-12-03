@@ -11,6 +11,7 @@ from Control.Monad import class Monad(..), mapM
 from StdList import map, ++, instance length [], foldl, zip2, flatten
 
 import qualified Data.List as DL
+import qualified Data.Set as DS
 
 instance toString UnificationError
 where
@@ -79,6 +80,9 @@ error err location = Infer \state. (Error [InferenceError location err], state)
 (-&-) (Error le) (Ok ra) = Error le
 (-&-) (Ok la) (Error re) = Error re
 (-&-) (Error le) (Error re) = Error (le ++ re)
+
+getTypes :: Infer TypeScope
+getTypes = Infer \state=:{types}. (Ok types, state)
 
 freshFunction :: String SourceLocation -> Infer Type
 freshFunction fname loc = Infer \state=:{fresh, types}.
@@ -175,33 +179,25 @@ where
 
 instance algM FDecl
 where
-	algM (FDecl loc name Nothing bodies) _
-	// Record that we have encountered a function without type in the environment
-	= freshFunction name loc
-		>>| mapM (\b. algM b TVoid) bodies
-		>>= \subs. return (flatten subs)
-
-	algM (FDecl loc name (Just type) bodies) _
+	algM (FDecl loc name type bodies) _
 	= storeFunctionType name loc type
-		>>| mapM (\b. algM b TVoid) bodies
+		>>| mapM (\b. algM b TVoid >>= \subs. applyEnv subs >>| return subs) bodies
 		>>= \subs. return (flatten subs)
 
 instance algM FBody
 where
-	/* algM function body
-	 * 1. Check arity of the matches
-	 */
-	algM (FBody loc name matches guards) _
-	= retrieve loc name
+	algM (FBody loc name matches guards) _ = saveTypes matches
+		>>= \typeMap. retrieve loc name
 		>>= \ftype. checkArity ftype matches
-		>>| freshN (length matches)
-		>>= \matchVariables. mapM (\(var, match). algM match var) (zip2 matchVariables matches)
-		>>= \subs1. return []
+		>>| checkDoubleVariableDeclarations (flatten (map collectVariables matches))
+		>>| mapM (\(var, match). algM match var) (zip2 (arguments ftype) matches)
+		>>= \subs1. applyEnv (flatten subs1)
+		>>| mapM (\guard. algM guard (returnType ftype)) guards
+		>>= \guardSubs. let allSubs = flatten subs1 ++ flatten guardSubs in
+			restoreTypes typeMap
+		>>| applyEnv allSubs
+		>>| return allSubs
 	where
-		// If we encounter a function body for which we do not know the exact type, we cannot know whether the arity is
-		// correct yet. Assume it is for now, errors will come when considering different alternatives of the same function
-		// or different applications of the function.
-		checkArity (TVar _) _ = return ()
 		checkArity ftype matches
 		# functionArity = arity ftype
 		| arity ftype <> length matches = error ("Function body has "
@@ -211,9 +207,77 @@ where
 			+ " arguments.") loc
 		= return ()
 
+		arguments (TFunc l r) = [l : arguments r]
+		arguments t = [t]
+
+		collectVariables (MVar _ v) = [v]
+		collectVariables (MTuple _ els) = flatten (map collectVariables els)
+		collectVariables (MList loc head tail) = collectVariables head ++ collectVariables tail
+		collectVariables _ = []
+
+		checkDoubleVariableDeclarations vars = case checkDoubleVariableDeclarations` vars 'DS'.newSet of
+			[] = return ()
+			vs = error ("Variables are multiply defined in function body: " + join ", " vs) loc
+		where
+			checkDoubleVariableDeclarations` [] _ = []
+			checkDoubleVariableDeclarations` [v:vs] varSet = case 'DS'.member v varSet of
+				False = checkDoubleVariableDeclarations` vs ('DS'.insert v varSet)
+				True = [v : checkDoubleVariableDeclarations` vs varSet]
+
+		restoreTypes previousTypes = getTypes
+			>>= \types. return (restoreTypes` previousTypes types)
+			>>= \after. Infer \state. (Ok (), {state & types = after})
+		where
+			restoreTypes` [] t = t
+			restoreTypes` [(name, type) : ts] t = restoreTypes` ts (put name type t)
+
+		saveTypes matches = return (flatten (map collectVariables matches))
+			>>= \introducedVariables. getTypes
+			>>= \types. return (saveTypes` introducedVariables types)
+		where
+			saveTypes` [] _ = []
+			saveTypes` [v : vs] typeScope = case get v typeScope of
+				Nothing = saveTypes` vs typeScope
+				Just t = [(v, t) : saveTypes` vs typeScope]
+
+instance algM FGuard
+where
+	algM (NonGuarded loc wexpr) t = algM wexpr t
+	algM (Guarded loc guard wexpr) t = return []
+
+instance algM WExpr
+where
+	algM (WExpr _ expr) t = algM expr t
+
 instance algM Match
 where
-	algM _ _ = return []
+	algM (MVar loc var) t = freshFunction var loc
+		>>= \fresh. liftUnify loc t fresh
+		>>= \subs. applyEnv subs
+		>>| return subs
+
+	algM (MInt loc _) t = liftUnify loc t TInt
+	algM (MString loc _) t = liftUnify loc t TString
+	algM (MChar loc _) t = liftUnify loc  t TChar
+	algM (MBool loc _) t = liftUnify loc t TBool
+	algM (MTuple loc els) t
+	= freshN (length els)
+		>>= \fresh. mapM (\(tvar, e). algM e tvar) (zip2 fresh els)
+		>>= \substitutions. let subs = flatten substitutions in
+			liftUnify loc (applySubstitutions subs t) (TTuple (map (applySubstitutions subs) fresh))
+		>>= \unifySubs. return ('DL'.union subs unifySubs)
+
+	algM (MEmptyList loc) t = fresh
+		>>= \listTypeVar. liftUnify loc t (TList listTypeVar)
+
+	algM (MList loc head tail) type
+	= fresh
+		>>= \headVar. algM head headVar
+		>>= \headSubs. algM tail (applySubstitutions headSubs (TList headVar))
+		>>= \tailSubs. let allSubs = 'DL'.union headSubs tailSubs in
+			return (applySubstitutions allSubs type, applySubstitutions allSubs headVar)
+		>>= \(reqT, hT). liftUnify loc reqT (TList hT)
+		>>= \unifySubs. return ('DL'.union allSubs unifySubs)
 
 instance algM Expr
 where
@@ -222,6 +286,10 @@ where
 	algM (CharExpr loc _)   t = liftUnify loc t TChar
 	algM (BoolExpr loc _)   t = liftUnify loc t TBool
 	algM (Nested loc e) t 	  = algM e t
+
+	algM (TupleExpr loc els) (TTuple elementTypes)
+	= mapM (\(type, element). algM element type) (zip2 elementTypes els)
+		>>= \subs. return (flatten subs)
 
 	algM (TupleExpr loc els) t
 	= freshN (length els)
@@ -242,6 +310,7 @@ where
 	algM (EmptyList loc) type = fresh
 		>>= \tt. liftUnify loc type (TList tt)
 
+	// Check if the variable is defined and unify with the demanded type
 	algM (FuncExpr loc name []) type
 	= retrieve loc name
 		>>= \functionType. liftUnify loc type functionType
@@ -259,21 +328,54 @@ where
 		>>= \functionType. freshN (length arguments)
 		>>= \vars. mapM (\(tvar, e). algM e tvar) (zip2 vars arguments)
 		>>= \sub1. fresh
-		>>= \retVar. liftUnify loc retVar type
-		>>= \sub2. (let subs = flatten sub1 ++ sub2 in
-				   let fType = toFunctionType (map (applySubstitutions subs) vars ++ [applySubstitutions subs retVar]) in
-				   liftUnifyFunc name loc fType functionType)
+		>>= \retVar.let subs = flatten sub1 in
+				   let fType = toFunctionType (map (applySubstitutions subs) vars ++ [applySubstitutions subs type]) in
+				   liftUnifyFunc name loc fType functionType
 	where
-		toFunctionType :: [Type] -> Type
-		toFunctionType [f, t] = TFunc f t
-		toFunctionType [e:es] = TFunc e (toFunctionType es)
-
-		returnType :: Type -> Type
-		returnType (TFunc f t) = returnType t
-		returnType t = t
-
 		liftUnifyFunc :: String SourceLocation Type Type -> Infer [Substitution]
 		liftUnifyFunc name loc derived required = Infer \state. case unify derived required of
 			Error _ = (Error [InferenceError loc (toString (FunctionApplicationError name derived required))], state)
 			Ok subs = (Ok subs, state)
 
+	algM (OrExpr loc l r) t = op2 loc TBool TBool t l r
+	algM (AndExpr loc l r) t = op2 loc TBool TBool t l r
+	algM (LeqExpr loc l r) t = op2 loc TInt TBool t l r
+	algM (GeqExpr loc l r) t = op2 loc TInt TBool t l r
+	algM (LesserExpr loc l r) t = op2 loc TInt TBool t l r
+	algM (GreaterExpr loc l r) t = op2 loc TInt TBool t l r
+	algM (PlusExpr loc l r) t = op2 loc TInt TInt t l r
+	algM (MinusExpr loc l r) t = op2 loc TInt TInt t l r
+	algM (TimesExpr loc l r) t = op2 loc TInt TInt t l r
+	algM (DivideExpr loc l r) t = op2 loc TInt TInt t l r
+	algM (ModuloExpr loc l r) t = op2 loc TInt TInt t l r
+
+	algM (NotExpr loc l) t = op1 loc TBool TBool t l
+	algM (NegExpr loc l) t = op1 loc TInt TInt t l
+
+	algM (EqExpr loc l r) t = fresh
+		>>= \fresh. algM l fresh
+		>>= \lsubs. algM r (applySubstitutions lsubs fresh)
+		>>= \rsubs. liftUnify loc (applySubstitutions (lsubs ++ rsubs) t) TBool
+	algM (NeqExpr loc l r) t = fresh
+		>>= \fresh. algM l fresh
+		>>= \lsubs. algM r (applySubstitutions lsubs fresh)
+		>>= \rsubs. liftUnify loc (applySubstitutions (lsubs ++ rsubs) t) TBool
+
+	algM (CaseExpr loc expr rules) t = fresh
+		>>= \exprVar. algM expr exprVar
+		>>= \exprSubs. mapM (\rule. algMMatchRule rule (applySubstitutions exprSubs exprVar) t) rules
+		>>= \ruleSubs. return (exprSubs ++ flatten ruleSubs)
+
+	where
+		algMMatchRule (MatchRule loc match expr) matchType exprType
+		= algM match matchType
+			>>= \subs. applyEnv subs
+			>>| algM expr (applySubstitutions subs exprType)
+			>>= \subs1. return (subs ++ subs1)
+
+op2 loc operandType returnType demandedType l r = algM l operandType
+	>>= \lsubs. algM r (applySubstitutions lsubs operandType)
+	>>= \rsubs. liftUnify loc (applySubstitutions (lsubs ++ rsubs) demandedType) (applySubstitutions (lsubs ++ rsubs) returnType)
+	>>= \unifySubs. return (lsubs ++ rsubs ++ unifySubs)
+op1 loc operandType returnType demandedType operand = algM operand operandType
+	>>= \operandSubs. liftUnify loc (applySubstitutions operandSubs demandedType) (applySubstitutions operandSubs returnType)

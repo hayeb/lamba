@@ -49,14 +49,12 @@ where
 
 instance toString FDecl
 where
-	toString (FDecl _ name (Just type) bodies) = name
+	toString (FDecl _ name type bodies) = name
 		+ " :: "
 		+ toString type
 		+ "\n"
 		+ join "\n" (map (\b. name + toString b) bodies)
 		+ "\n"
-
-	toString (FDecl _ name Nothing bodies) = name + "\n" + join "\n" (map (\b. name + toString b) bodies) + "\n"
 
 instance toString FBody
 where
@@ -115,3 +113,11 @@ where
 arity :: Type -> Int
 arity (TFunc f t) = inc (arity t)
 arity _ = 0
+
+returnType :: Type -> Type
+returnType (TFunc f t) = returnType t
+returnType t = t
+
+toFunctionType :: [Type] -> Type
+toFunctionType [f, t] = TFunc f t
+toFunctionType [e:es] = TFunc e (toFunctionType es)

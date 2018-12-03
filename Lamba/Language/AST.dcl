@@ -7,7 +7,7 @@ import StdString
 
 :: AST = AST [FDecl]
 
-:: FDecl = FDecl SourceLocation String (Maybe Type) [FBody]
+:: FDecl = FDecl SourceLocation String Type [FBody]
 
 :: FBody = FBody SourceLocation String [Match] [FGuard]
 
@@ -68,3 +68,5 @@ instance == Type, SourceLocation
 instance < SourceLocation
 
 arity :: Type -> Int
+returnType :: Type -> Type
+toFunctionType :: [Type] -> Type

@@ -7,7 +7,7 @@ format :: AST -> String
 format (AST decls) = join "\n\n" (map formatDecl decls)
 
 formatDecl :: FDecl -> String
-formatDecl (FDecl loc name (Just type) bodies) = name
+formatDecl (FDecl loc name type bodies) = name
 	+ " :: "
 	+ formatType type
 	+ "\n"
@@ -32,6 +32,7 @@ formatType TVoid = "Void"
 formatType (TFunc f t) = formatType f + " -> " + formatType t
 formatType (TTuple els) = "(" + join ", " (map formatType els) + ")"
 formatType (TList t) = "[" + formatType t + "]"
+formatType (TVar v) = "TVar " + toString v
 
 formatMatch :: Match -> String
 formatMatch (MVar loc s) = s
