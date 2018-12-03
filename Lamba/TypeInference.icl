@@ -8,7 +8,7 @@ import StdInt, StdMisc, StdBool, StdTuple, StdDebug
 import Text
 
 from Control.Monad import class Monad(..), mapM
-from StdList import map, ++, instance length [], foldl, zip2, flatten
+from StdList import map, ++, instance length [], foldl, zip2, flatten, isMember
 
 import qualified Data.List as DL
 import qualified Data.Set as DS
@@ -21,10 +21,8 @@ where
 
 instance toString InferenceError
 where
-	toString (InferenceError (line, col) str)
-	= "[" + toString line + ":" + toString col + "] Type error: " + str
-
-	toString (UndefinedVariableError var loc) = toString loc + "Undefined variable: " + var
+	toString (InferenceError loc str) = toString loc + " Type error: " + str
+	toString (UndefinedVariableError var loc) = toString loc + " Undefined variable: " + var
 
 instance toString IEnv
 where
@@ -187,14 +185,14 @@ where
 instance algM FBody
 where
 	algM (FBody loc name matches guards) _ = saveTypes matches
-		>>= \typeMap. retrieve loc name
+		>>= \(newlyIntroduced, typeMap). retrieve loc name
 		>>= \ftype. checkArity ftype matches
 		>>| checkDoubleVariableDeclarations (flatten (map collectVariables matches))
 		>>| mapM (\(var, match). algM match var) (zip2 (arguments ftype) matches)
 		>>= \subs1. applyEnv (flatten subs1)
 		>>| mapM (\guard. algM guard (returnType ftype)) guards
 		>>= \guardSubs. let allSubs = flatten subs1 ++ flatten guardSubs in
-			restoreTypes typeMap
+			restoreTypes newlyIntroduced typeMap
 		>>| applyEnv allSubs
 		>>| return allSubs
 	where
@@ -224,21 +222,25 @@ where
 				False = checkDoubleVariableDeclarations` vs ('DS'.insert v varSet)
 				True = [v : checkDoubleVariableDeclarations` vs varSet]
 
-		restoreTypes previousTypes = getTypes
-			>>= \types. return (restoreTypes` previousTypes types)
+		restoreTypes :: [String] [(String, (SourceLocation, Type))] -> Infer ()
+		restoreTypes introduced previousTypes = getTypes
+			>>= \types. return (restoreTypes` previousTypes introduced types)
 			>>= \after. Infer \state. (Ok (), {state & types = after})
 		where
-			restoreTypes` [] t = t
-			restoreTypes` [(name, type) : ts] t = restoreTypes` ts (put name type t)
+			restoreTypes` [] introduced t = filterWithKey (\n _. not (isMember n introduced)) t
+			restoreTypes` [(name, type) : ts] introduced t = restoreTypes` ts introduced (put name type t)
 
+		saveTypes :: [Match] -> Infer ([String], [(String, (SourceLocation, Type))])
 		saveTypes matches = return (flatten (map collectVariables matches))
 			>>= \introducedVariables. getTypes
 			>>= \types. return (saveTypes` introducedVariables types)
 		where
-			saveTypes` [] _ = []
-			saveTypes` [v : vs] typeScope = case get v typeScope of
-				Nothing = saveTypes` vs typeScope
-				Just t = [(v, t) : saveTypes` vs typeScope]
+			saveTypes` [] _ = ([], [])
+			saveTypes` [v : vs] typeScope
+			# (introduced, existing) = saveTypes` vs typeScope
+			= case get v typeScope of
+				Nothing = ([v : introduced], existing)
+				Just t = (introduced, [(v, t) : existing])
 
 instance algM FGuard
 where

@@ -1,7 +1,7 @@
 fib :: Int -> Int
 fib 0 = 1
 fib 1 = 1
-fib n = (fib (n - 1)) + (fib (n - 2))
+fib n = fib (n - 1) + fib (n - 2)
 
 choose :: Bool -> String
 choose bool
@@ -41,7 +41,7 @@ hd [bla:rest] = 0
 otherHd :: [Int] -> Int
 otherHd l = match l:
 	[] -> 0
-	[string:rest] -> bla
+	[e:es] -> e
 
 tl :: [Int] -> [Int]
 tl [] = []
