@@ -91,6 +91,10 @@ storeFunctionType :: String SourceLocation Type -> Infer Type
 storeFunctionType fname loc type = Infer \state=:{types}.
 	(Ok type, {state & types = put fname (loc, type) types})
 
+recordExprType :: SourceLocation Type -> Infer ()
+recordExprType loc type = Infer \state=:{exprTypes}.
+	(Ok (), {state & exprTypes = put loc type exprTypes})
+
 fresh :: Infer Type
 fresh = Infer \state=:{fresh}. (Ok (TVar fresh), {state & fresh = inc fresh})
 
@@ -105,13 +109,13 @@ retrieve loc name = Infer \state=:{types}.
 	Nothing = (Error [UndefinedVariableError name loc], state)
 	Just type = (Ok (snd type), state)
 
-infer :: AST -> MaybeError [InferenceError] TypeScope
+infer :: AST -> MaybeError [InferenceError] (Map SourceLocation Type)
 infer ast
 # (Infer infer) = algM ast TVoid
-# initialState = {fresh = 0, types = newMap}
+# initialState = {fresh = 0, types = newMap, exprTypes = newMap}
 = case infer initialState of
 	(Error es, st) = Error es
-	(Ok subs, {types}) = Ok types
+	(Ok subs, {exprTypes}) = Ok exprTypes
 
 applySubstitutionsEnv :: [Substitution] IEnv -> IEnv
 applySubstitutionsEnv subs env=:{types}
@@ -249,7 +253,9 @@ where
 
 instance algM WExpr
 where
-	algM (WExpr _ expr) t = algM expr t
+	algM (WExpr loc expr) t = algM expr t
+		>>= \subs. recordExprType loc (applySubstitutions subs t)
+		>>| return subs
 
 instance algM Match
 where
@@ -329,8 +335,7 @@ where
 	= retrieve loc name // Gives error if function undefined
 		>>= \functionType. freshN (length arguments)
 		>>= \vars. mapM (\(tvar, e). algM e tvar) (zip2 vars arguments)
-		>>= \sub1. fresh
-		>>= \retVar.let subs = flatten sub1 in
+		>>= \sub1. let subs = flatten sub1 in
 				   let fType = toFunctionType (map (applySubstitutions subs) vars ++ [applySubstitutions subs type]) in
 				   liftUnifyFunc name loc fType functionType
 	where

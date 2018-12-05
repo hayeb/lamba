@@ -6,6 +6,7 @@ import Lamba.Tokenizer
 import Lamba.Parser
 import Lamba.TypeInference
 import Lamba.Formatter
+import Lamba.CodeGenerator
 import Lamba.Language.Token
 import Lamba.Language.AST
 

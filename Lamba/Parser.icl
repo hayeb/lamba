@@ -325,15 +325,16 @@ pFGuard
 | debug "Parsing function guard" = undef
 = (pSymbols "\n|"
 		>>| loc
-		>>= \loc. strict pExpr (\(l, t). General l "Could not parse guard LHS")
+		>>= \geloc. strict pExpr (\(l, t). General l "Could not parse guard LHS")
 		>>= \ge. db  "Parsed guard left" (pSymbol '=')
-		>>| pExpr
-		>>= \re. db "Parsed guard right" (pure (Guarded loc (WExpr Nothing ge) (WExpr Nothing re))))
+		>>| loc
+		>>= \reloc. pExpr
+		>>= \re. db "Parsed guard right" (pure (Guarded geloc (WExpr geloc ge) (WExpr reloc re))))
 	<|> (optionalNewline
 		>>| pSymbols "="
 		>>| loc
 		>>= \loc. pExpr
-		>>= \e. pure (NonGuarded loc (WExpr Nothing e)))
+		>>= \e. pure (NonGuarded loc (WExpr loc e)))
 
 pMatch :: Parser Match
 pMatch

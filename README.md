@@ -22,3 +22,6 @@ Lamba is a pure, functional programming language. It is going to (roughly) suppo
 * Polymorphism
 
 Example programs can be found in the testprograms folder.
+
+### TODO
+* Disallow defining the same function multiple times

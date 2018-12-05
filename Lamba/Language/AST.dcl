@@ -33,7 +33,7 @@ import StdString
 	| MEmptyList SourceLocation
 	| MList SourceLocation Match Match
 
-:: WExpr = WExpr (Maybe Type) Expr
+:: WExpr = WExpr SourceLocation Expr
 
 :: Expr = OrExpr SourceLocation Expr Expr
 	| AndExpr SourceLocation Expr Expr

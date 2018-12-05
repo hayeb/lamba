@@ -101,8 +101,7 @@ where
 
 instance toString WExpr
 where
-	toString (WExpr Nothing e) = toString e
-	toString (WExpr (Just t) e) = bracket ("TypedExpr " + toString e + " [" + toString t + "]")
+	toString (WExpr loc e) = bracket ("TypedExpr "  + toString loc + " " + toString e)
 
 bracket s = "(" + s + ")"
 
