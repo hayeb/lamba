@@ -13,8 +13,5 @@ from Data.Map import :: Map
 
 :: AssemblyInstruction = AssemblyInstruction (Maybe Label) Instruction (Maybe Comment)
 
-class genCode a where
-	genCode :: a (Map SourceLocation Type) -> MaybeError [CodeGenError] [AssemblyInstruction]
-
-instance genCode AST
+generateCode :: AST (Map SourceLocation Type) -> MaybeError [CodeGenError] [AssemblyInstruction]
 
