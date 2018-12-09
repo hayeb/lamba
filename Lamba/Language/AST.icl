@@ -120,3 +120,11 @@ returnType t = t
 toFunctionType :: [Type] -> Type
 toFunctionType [f, t] = TFunc f t
 toFunctionType [e:es] = TFunc e (toFunctionType es)
+
+arguments :: Type -> [Type]
+arguments (TFunc l r) = [l : arguments r]
+arguments t = [t]
+
+withoutReturnType :: Type -> [Type]
+withoutReturnType (TFunc l r) = [l : withoutReturnType r]
+withoutReturnType _ = []

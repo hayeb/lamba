@@ -70,3 +70,6 @@ instance < SourceLocation
 arity :: Type -> Int
 returnType :: Type -> Type
 toFunctionType :: [Type] -> Type
+arguments :: Type -> [Type]
+
+withoutReturnType :: Type -> [Type]

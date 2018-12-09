@@ -26,7 +26,7 @@ from Data.Map import :: Map
 :: InferenceError = InferenceError SourceLocation String
 	| UndefinedVariableError String SourceLocation
 
-infer :: AST -> MaybeError [InferenceError] (Map SourceLocation Type)
+infer :: AST -> MaybeError [InferenceError] TypeScope
 runInfer :: (Infer a) IEnv -> (MaybeError [InferenceError] a, IEnv)
 
 instance toString IEnv, InferenceError, UnificationError

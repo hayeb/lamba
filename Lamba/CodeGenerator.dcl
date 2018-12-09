@@ -7,11 +7,6 @@ from Data.Map import :: Map
 
 :: CodeGenError :== String
 :: Label :== String
-:: Comment :== String
 
-:: Instruction = NOP
-
-:: AssemblyInstruction = AssemblyInstruction (Maybe Label) Instruction (Maybe Comment)
-
-generateCode :: AST (Map SourceLocation Type) -> MaybeError [CodeGenError] [AssemblyInstruction]
+generateCode :: AST (Map String (SourceLocation, Type)) -> MaybeError CodeGenError [String]
 

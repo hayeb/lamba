@@ -109,13 +109,13 @@ retrieve loc name = Infer \state=:{types}.
 	Nothing = (Error [UndefinedVariableError name loc], state)
 	Just type = (Ok (snd type), state)
 
-infer :: AST -> MaybeError [InferenceError] (Map SourceLocation Type)
+infer :: AST -> MaybeError [InferenceError] TypeScope
 infer ast
 # (Infer infer) = algM ast TVoid
 # initialState = {fresh = 0, types = newMap, exprTypes = newMap}
 = case infer initialState of
 	(Error es, st) = Error es
-	(Ok subs, {exprTypes}) = Ok exprTypes
+	(Ok subs, {types}) = Ok types
 
 applySubstitutionsEnv :: [Substitution] IEnv -> IEnv
 applySubstitutionsEnv subs env=:{types}
@@ -209,8 +209,6 @@ where
 			+ " arguments.") loc
 		= return ()
 
-		arguments (TFunc l r) = [l : arguments r]
-		arguments t = [t]
 
 		collectVariables (MVar _ v) = [v]
 		collectVariables (MTuple _ els) = flatten (map collectVariables els)
