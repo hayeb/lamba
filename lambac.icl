@@ -69,8 +69,8 @@ openFile = CIO \cs. case readFile cs.fileName cs.world of
 formatTokens :: [(TokenLocation, Token)] -> String
 formatTokens tokens = join "\n" (map toString tokens)
 
-formatTypesEnv :: (Map SourceLocation Type) -> String
-formatTypesEnv types = join "\n" (map (\(loc, type). toString loc
+formatTypesEnv :: (Map String (SourceLocation, Type)) -> String
+formatTypesEnv types = join "\n" (map (\(name , (loc, type)). toString name
 	+ " :: "
 	+ toString type)
 	(toList types))
@@ -104,7 +104,10 @@ where
 			Ok ast = pure ast
 		>>= \ast. case infer ast of
 			Error e = compileError (join "\n" (map toString e))
-			Ok types = print ("Type inferencing succeeded\n" + formatTypesEnv types)
+			Ok fTypes = return fTypes
+		>>= \types. case generateCode ast types of
+			Error e = compileError e
+			Ok c = print (join "\n" c)
 		>>| return ()
 
 	closeConsole console world
