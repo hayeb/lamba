@@ -14,15 +14,13 @@ from Control.Monad import class Monad(..), mapM
 :: CGState = CGState Int (Map String Substitution)
 :: CG a = CG (CGState -> (MaybeError CodeGenError a, CGState))
 
+:: FVarMap :== Map String (SourceLocation, Type, Bool)
+
 :: Substitution = SVariable String
 	| SInt Int
 	| SString String
 	| SChar Char
 	| SBool Bool
-
-class genCode a r
-where
-	genCode :: a (Map String (SourceLocation, Type, Bool)) -> CG r
 
 instance pure CG
 where
@@ -90,7 +88,7 @@ toLLVMType (TTuple els)
 = "type {" + join ", " elTypes +  "}*"
 toLLVMType (TList t) = "type {" + toLLVMType t + ", i64*}*"
 
-collectVariables :: [Match] [Type] [String] (Map String (SourceLocation, Type, Bool)) -> (Map String (SourceLocation, Type, Bool), [(String, Substitution)], [String])
+collectVariables :: [Match] [Type] [String] FVarMap -> (FVarMap, [(String, Substitution)], [String])
 // Simple match expressions do not introduce variables
 collectVariables [] [] _ m = (m, [], [])
 collectVariables [match:ms] [t:ts] [arg:args] m
@@ -100,7 +98,7 @@ collectVariables [match:ms] [t:ts] [arg:args] m
 where
 	collectVariable match type m = collectVariable` match type [] arg m
 	where
-		collectVariable` (MVar loc varname) t introCode result m = (put varname (loc, t, True) m,[(varname, SVariable result)], introCode)
+		collectVariable` (MVar loc varname) t introCode result m = (put varname (loc, t, False) m,[(varname, SVariable result)], introCode)
 		// collectVariable (MTuple _ els) (TTuple tels) m = foldr (\(t, e) m. collectVariable e t m) m (zip2 tels els)
 		// collectVariable (MList _ hd tl) (TList t) m = collectVariable tl (TList t) (collectVariable hd t m)
 		collectVariable` _ _ _ _ m = (m, [], [])
@@ -108,132 +106,127 @@ where
 generateCode :: AST (Map String (SourceLocation, Type)) -> MaybeError CodeGenError [String]
 generateCode ast types
 # state = CGState 0 newMap
-= case genCode ast $ fromList (typeState $ toList types) of
+= case genAST ast $ fromList (toFVarMap (toList types)) of
 	(CG f) = fst (f state)
 where
-	typeState [] = []
-	typeState [(name, (loc, t)) : types] = [(name, (loc, t, False)) : typeState types]
+	toFVarMap [] = []
+	toFVarMap [(s, (l, t)) : r] = [(s, (l, t, False)) : toFVarMap r]
 
-instance genCode AST [String]
-where
-	genCode (AST decls) m = mapM (\b. genCode b m) decls
-		>>= \declsCode. return (flatten declsCode)
+genAST :: AST FVarMap -> CG [String]
+genAST (AST decls) m = mapM (\b. genDecl b m) decls
+	>>= \declsCode. return (flatten declsCode)
 
-instance genCode FDecl [String]
+genDecl :: FDecl FVarMap -> CG [String]
+genDecl (FDecl loc name type bodies) m
+# llvmReturnType = toLLVMType (returnType type)
+# llvmArguments = map toLLVMType (withoutReturnType type)
+# llvmArgumentsIndexed = zip2 (indexList llvmArguments) llvmArguments
+# fName = "define " + llvmReturnType + " @" + name  + "(" + join ", " (map genParam llvmArgumentsIndexed) + ")"
+= genBodies bodies
+	>>= \bodies. return ([fName + " {"] ++ bodies ++ noMatchCode ++ ["}"])
 where
-	genCode (FDecl loc name type bodies) m
-	# llvmReturnType = toLLVMType (returnType type)
-	# llvmArguments = map toLLVMType (withoutReturnType type)
-	# llvmArgumentsIndexed = zip2 (indexList llvmArguments) llvmArguments
-	# fName = "define " + llvmReturnType + " @" + name  + "(" + join ", " (map genParam llvmArgumentsIndexed) + ")"
-	= genBodies bodies
-		>>= \bodies. return ([fName + " {"] ++ bodies ++ noMatchCode ++ ["}"])
+	/* For every body:
+	 * 1. Generate the match code
+	 * 2. Introduce variables from the match
+	 *
+	 * Executing a function:
+	 * 1. Start at the first match code
+	 * 2. When it matches, jump to the first body code
+	 * 3. When it does not matche, jump to the next body
+	 * 4. When the final match does not match, jump to the "match exception" code.
+	 */
+	noMatchCode = ["noMatchLabel:", "\tret i64 -1"]
+
+	genParam (index, type) = type + " %arg" + toString index
+
+	genBodies bodies = genBodies` bodies matchLabels bodyLabels
 	where
-		/* For every body:
-		 * 1. Generate the match code
-		 * 2. Introduce variables from the match
-		 *
-		 * Executing a function:
-		 * 1. Start at the first match code
-		 * 2. When it matches, jump to the first body code
-		 * 3. When it does not matche, jump to the next body
-		 * 4. When the final match does not match, jump to the "match exception" code.
-		 */
-		noMatchCode = ["noMatchLabel:", "\tret i64 -1"]
+		matchLabels = [ "match" + toString n \\ n <- [0..]]
+		bodyLabels = ["body" + toString n \\ n <- [0..]]
 
-		genParam (index, type) = type + " %arg" + toString index
+		// The final body. When the match does not match, jump to the match exception code.
+		genBodies` [FBody _ name matches guards] [matchLabel:_] [bodyLabel:_] = genBody matches guards matchLabel "noMatchLabel" bodyLabel
+		genBodies` [FBody _ _ matches guards : bs] [matchLabel, nextMatchLabel : ms] [bodyLabel : bodyLabels]
+			= genBody matches guards matchLabel (nextMatchLabel + "arg0") bodyLabel
+				>>= \body. genBodies` bs [nextMatchLabel : ms] bodyLabels
+				>>= \bodies. return (body ++ bodies)
 
-		genBodies bodies = genBodies` bodies matchLabels bodyLabels
-		where
-			matchLabels = [ "match" + toString n \\ n <- [0..]]
-			bodyLabels = ["body" + toString n \\ n <- [0..]]
+		// Generated the body (matches + guards) for a single function body.
+		genBody :: [Match] [FGuard] String String String -> CG [String]
+		genBody matches guards matchLabel nextMatchLabel bodyLabel
+		# args = ["arg" + toString n \\ n<- [0..]]
+		= genMatches matches args matchLabel nextMatchLabel bodyLabel
+			>>= \matchCode. return (collectVariables matches (withoutReturnType type) args m)
+			>>= \(stateWithVariables, subs, introduceCode). mapM (\(name, sub). addSubstitution name sub) subs
+			>>| mapM (\guard. genGuard guard stateWithVariables) guards
+			>>= \bodyCode. return (matchCode ++ addLabel bodyLabel (indent (introduceCode ++ (flatten bodyCode))))
 
-			// The final body. When the match does not match, jump to the match exception code.
-			genBodies` [FBody _ name matches guards] [matchLabel:_] [bodyLabel:_] = genBody matches guards matchLabel "noMatchLabel" bodyLabel
-			genBodies` [FBody _ _ matches guards : bs] [matchLabel, nextMatchLabel : ms] [bodyLabel : bodyLabels]
-				= genBody matches guards matchLabel (nextMatchLabel + "arg0") bodyLabel
-					>>= \body. genBodies` bs [nextMatchLabel : ms] bodyLabels
-					>>= \bodies. return (body ++ bodies)
-
-			// Generated the body (matches + guards) for a single function body.
-			genBody :: [Match] [FGuard] String String String -> CG [String]
-			genBody matches guards matchLabel nextMatchLabel bodyLabel
-			# args = ["arg" + toString n \\ n<- [0..]]
-			= genMatches matches args matchLabel nextMatchLabel bodyLabel
-				>>= \matchCode. return (collectVariables matches (withoutReturnType type) args m)
-				>>= \(stateWithVariables, subs, introduceCode). mapM (\(name, sub). addSubstitution name sub) subs
-				>>| mapM (\guard. genCode guard stateWithVariables) guards
-				>>= \bodyCode. return (matchCode ++ addLabel bodyLabel (indent (introduceCode ++ (flatten bodyCode))))
+		// Generates the match code for a single function body.
+		genMatches :: [Match] [String] String String String -> CG [String]
+		genMatches [] _ _ _ bodyLabel = return $ indent ["br label %" + bodyLabel]
+		genMatches [match] [arg:_] currentMatchLabel nextMatchLabel bodyLabel = genMatch (arg, match) m
+			>>= \(matchCode, result). return (addLabel (currentMatchLabel + arg) (indent (matchCode ++ ["br i1 %" + result + ", label %" + bodyLabel + ", label %" + nextMatchLabel])))
+		genMatches [match : ms] [arg, nextArg : args] currentMatchLabel nextMatchLabel bodyLabel = genMatch (arg, match) m
+			>>= \(matchCode, result). genMatches ms [nextArg : args] currentMatchLabel nextMatchLabel bodyLabel
+			>>= \matchCodes. return (addLabel (currentMatchLabel + arg) (indent (matchCode ++ ["br i1 %" + result + ", label %" + currentMatchLabel + nextArg + ", label %" + nextMatchLabel]) ++ matchCodes))
 
 
-			// Generates the match code for a single function body.
-			genMatches :: [Match] [String] String String String -> CG [String]
-			genMatches [] _ _ _ bodyLabel = return $ indent ["br label %" + bodyLabel]
-			genMatches [match] [arg:_] currentMatchLabel nextMatchLabel bodyLabel = genCode (arg, match) m
-				>>= \(matchCode, result). return (addLabel (currentMatchLabel + arg) (indent (matchCode ++ ["br i1 %" + result + ", label %" + bodyLabel + ", label %" + nextMatchLabel])))
-			genMatches [match : ms] [arg, nextArg : args] currentMatchLabel nextMatchLabel bodyLabel = genCode (arg, match) m
-				>>= \(matchCode, result). genMatches ms [nextArg : args] currentMatchLabel nextMatchLabel bodyLabel
-				>>= \matchCodes. return (addLabel (currentMatchLabel + arg) (indent (matchCode ++ ["br i1 %" + result + ", label %" + currentMatchLabel + nextArg + ", label %" + nextMatchLabel]) ++ matchCodes))
+genGuard :: FGuard FVarMap -> CG [String]
+genGuard (NonGuarded loc (WExpr _ e)) m = genExpr e m
+	>>= \(ecode, identifier). getSubstitution identifier
+	>>= \sub. return (ecode ++ ["ret i64 " + substitutionToConstant sub])
 
-instance genCode FGuard [String]
-where
-	genCode (NonGuarded loc (WExpr _ e)) m = genCode e m
-		>>= \(ecode, identifier). getSubstitution identifier
-		>>= \sub. return (ecode ++ ["ret i64 " + substitutionToConstant sub])
+genGuard (Guarded loc left right) m = error $ toString loc + ": guarded expressions not implemented"
 
-	genCode (Guarded loc left right) m = error $ toString loc + ": guarded expressions not implemented"
-
+genMatch :: (String, Match) FVarMap -> CG ([String], String)
 // (match variable, this label, match label, fail label)
-instance genCode (String, Match) ([String], String)
+genMatch (arg, match) m = genMatch` match
 where
-	genCode (arg, match) m = genMatch match
-	where
-		genMatch (MInt loc n) = newLocal
-			>>= \local. return (["%" + local + " = icmp eq i64 %" + arg + ", " + toString n], local)
+	genMatch` (MInt loc n) = newLocal
+		>>= \local. return (["%" + local + " = icmp eq i64 %" + arg + ", " + toString n], local)
 
-		genMatch (MVar loc _) = newLocal
-			>>= \local. return (["%" + local + " = add i1 0, 1"], local)
+	genMatch` (MVar loc _) = newLocal
+		>>= \local. return (["%" + local + " = add i1 0, 1"], local)
 
 // (Code, result identifier)
-instance genCode Expr ([String], String)
+genExpr :: Expr FVarMap -> CG ([String], String)
+genExpr (NumberExpr loc n) _ = newLocal
+	>>= \local. addSubstitution local (SInt n)
+	>>| return ([], local)
+
+genExpr (Nested loc e) m = genExpr e m
+
+genExpr (PlusExpr loc l r) m = genExpr l m
+	>>= \(lcode, lid). genExpr r m
+	>>= \(rcode, rid). newLocal
+	>>= \resultLocal. getSubstitution lid
+	>>= \lsub. getSubstitution rid
+	>>= \rsub. return (lcode ++ rcode ++ ["%" + resultLocal + " = " + "add i64 " + substitutionToConstant lsub + ", " + substitutionToConstant rsub], resultLocal)
+
+genExpr (MinusExpr loc l r) m = genExpr l m
+	>>= \(lcode, lid). genExpr r m
+	>>= \(rcode, rid). newLocal
+	>>= \resultLocal. getSubstitution lid
+	>>= \lsub. getSubstitution rid
+	>>= \rsub. return (lcode ++ rcode ++ ["%" + resultLocal + " = " + "sub i64 " + substitutionToConstant lsub + ", " + substitutionToConstant rsub], resultLocal)
+
+genExpr (FuncExpr loc name args) m = case get name m of
+	Nothing = error ("No type for function " + name)
+	Just (_, ftype, True) = return ([], name)
+	Just (_, ftype, False)
+	# argTypes = map toLLVMType (withoutReturnType ftype)
+	# rettype = returnType ftype
+	# fcall = "tail call ccc " + toLLVMType rettype + " @" + name
+	= mapM (\a. genExpr a m) args
+		>>= \argsCode. newLocal
+		>>= \resultLocal. mapM retrieveArguments (zip2 argTypes argsCode)
+		>>= \argsWithSubs. return (retrieveCode argsCode ++ ["%" + resultLocal + " = " + fcall + "(" + join ", " argsWithSubs + ")"], resultLocal)
 where
-	genCode (NumberExpr loc n) _ = newLocal
-		>>= \local. addSubstitution local (SInt n)
-		>>| return ([], local)
+	retrieveCode [] = []
+	retrieveCode [(c, _) : cs] = c ++ retrieveCode cs
 
-	genCode (Nested loc e) m = genCode e m
+	retrieveArguments (t, (_, l)) = getSubstitution l
+		>>= \sub. return (t + " " + substitutionToConstant sub)
 
-	genCode (PlusExpr loc l r) m = genCode l m
-		>>= \(lcode, lid). genCode r m
-		>>= \(rcode, rid). newLocal
-		>>= \resultLocal. getSubstitution lid
-		>>= \lsub. getSubstitution rid
-		>>= \rsub. return (lcode ++ rcode ++ ["%" + resultLocal + " = " + "add i64 " + substitutionToConstant lsub + ", " + substitutionToConstant rsub], resultLocal)
-
-	genCode (MinusExpr loc l r) m = genCode l m
-		>>= \(lcode, lid). genCode r m
-		>>= \(rcode, rid). newLocal
-		>>= \resultLocal. getSubstitution lid
-		>>= \lsub. getSubstitution rid
-		>>= \rsub. return (lcode ++ rcode ++ ["%" + resultLocal + " = " + "sub i64 " + substitutionToConstant lsub + ", " + substitutionToConstant rsub], resultLocal)
-
-	genCode (FuncExpr loc name args) m = case get name m of
-		Nothing = error ("No type for function " + name)
-		Just (_, ftype, True) = return ([], name)
-		Just (_, ftype, False)
-		# argTypes = map toLLVMType (withoutReturnType ftype)
-		# rettype = returnType ftype
-		# fcall = "tail call ccc " + toLLVMType rettype + " @" + name
-		= mapM (\a. genCode a m) args
-			>>= \argsCode. newLocal
-			>>= \resultLocal. mapM retrieveArguments (zip2 argTypes argsCode)
-			>>= \argsWithSubs. return (retrieveCode argsCode ++ ["%" + resultLocal + " = " + fcall + "(" + join ", " argsWithSubs + ")"], resultLocal)
-	where
-		retrieveCode [] = []
-		retrieveCode [(c, _) : cs] = c ++ retrieveCode cs
-
-		retrieveArguments (t, (_, l)) = getSubstitution l
-			>>= \sub. return (t + " " + substitutionToConstant sub)
-
-	genCode e m = error ("genCode not matching: " + toString e)
+genExpr e m = error ("genCode not matching: " + toString e)
 
