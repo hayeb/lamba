@@ -181,6 +181,8 @@ where
 		>>= \(ecode, identifier). getSubstitution identifier
 		>>= \sub. return (ecode ++ ["ret i64 " + substitutionToConstant sub])
 
+	genCode (Guarded loc left right) m = error $ toString loc + ": guarded expressions not implemented"
+
 // (match variable, this label, match label, fail label)
 instance genCode (String, Match) ([String], String)
 where

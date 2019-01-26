@@ -3,4 +3,5 @@ fac n
 | n == 1 = 1
 | n = n * fac (n - 1)
 
+Main :: Int
 Main = fac 15
