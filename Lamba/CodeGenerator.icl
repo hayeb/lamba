@@ -54,7 +54,7 @@ newLocal = CG \(CGState newvar subs). (Ok ("loc" + toString newvar), CGState (in
 
 comment str c = str + "; " + c
 
-indent lines = map (\line. "\t" + line) lines
+indent lines = map ((+) "\t") lines
 
 addLabel label cs = [label + ":" : cs]
 

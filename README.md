@@ -25,3 +25,13 @@ Example programs can be found in the testprograms folder.
 
 ### TODO
 * Disallow defining the same function multiple times
+
+
+
+#### TODO codegenerator
+1. Decide on string representation
+2. Decide on tuple representation
+3. Decide on list representation
+4. Implement failing match code
+5. Implement code generation for string/tuple/list
+6. Implement 
