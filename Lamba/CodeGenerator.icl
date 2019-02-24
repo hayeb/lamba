@@ -262,6 +262,10 @@ where
 	retrieveArguments (t, (_, l)) = getSubstitution l
 		>>= \sub. return (t + " " + substitutionToConstant sub)
 
+//genExpr (CaseExpr loc e rules) m = genExpr r m
+	//>>= \(ebody, result). getSubstitution result
+	//>>= \resultSub. mapM ()
+
 
 genExpr e m = error ("genCode not matching: " + toString e)
 
