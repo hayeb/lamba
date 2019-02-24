@@ -4,5 +4,12 @@ fac n
 | n == 0 = 1
 = n * fac (n - 1)
 
+
+fac2 :: Int -> Int
+fac2 n = match n:
+	0 -> 1
+	1 -> 1
+	n -> n * fac (n-1)
+
 main :: Int
 main = fac 15
