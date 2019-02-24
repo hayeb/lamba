@@ -1,7 +1,8 @@
 fac :: Int -> Int
 fac n
 | n == 1 = 1
-| n = n * fac (n - 1)
+| n == 0 = 1
+= n * fac (n - 1)
 
-Main :: Int
-Main = fac 15
+main :: Int
+main = fac 15
